@@ -4,6 +4,7 @@ import { relative, twistDeg } from './quat.js';
 import { RepDetector } from './reps.js';
 import { loadSessions, saveSession, clearSessions, loadSettings, saveSettings, exportCsv } from './store.js';
 import { romChart } from './chart.js';
+import { figure } from './figures.js';
 
 const app = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -80,6 +81,10 @@ function lastFor(sessions, ex) {
 function setup(ex) {
   app.innerHTML = `
     <div class="topbar"><button class="small ghost" id="back">‹ Back</button><h1>${ex.joint}: ${ex.name}</h1></div>
+    <div class="card figwrap">
+      ${figure(ex.id, settings.hand)}
+      <div class="legend"><span><i class="sw screen"></i> screen side of phone</span><span><i class="sw pos"></i> ${ex.pos}</span>${ex.neg ? `<span><i class="sw neg"></i> ${ex.neg}</span>` : ''}<span class="muted">${settings.hand} hand</span></div>
+    </div>
     <div class="card grip">
       <div class="step"><span class="n">1</span><div><span class="eyebrow">Grip</span><p>${GRIP}</p></div></div>
       <div class="step"><span class="n">2</span><div><span class="eyebrow">Starting position</span><p>${ex.arm}</p></div></div>
