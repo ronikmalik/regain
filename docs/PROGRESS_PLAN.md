@@ -68,4 +68,4 @@ All computed on device, per set, at save time (cached on the session object).
 3. DONE: Set report gets smoothness and time to peak; tapping a bar opens it.
 4. DONE: Replay and overlay.
 5. DONE: Calendar, pain correlation, weekly summary.
-6. DONE: Therapist report (printable page, share summary, JSON export). NEXT: sync.
+6. DONE: Therapist report. Sync: built (Supabase magic-link accounts, RLS, tombstone sync, consent, delete account); needs project keys to go live.

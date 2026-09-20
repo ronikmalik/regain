@@ -49,6 +49,26 @@ pronation/supination, elbow flexion, shoulder forward raise. Adding one is a 6-l
 
 Progress shows a weekly summary with guidance, a consistency calendar, recovery timelines with milestones and a projected date to target, hold and smoothness trends, pain vs range, two-set overlay and per-set replay. A printable therapist report (Progress > Therapist report) summarises everything with share and JSON export. See [docs/PROGRESS_PLAN.md](docs/PROGRESS_PLAN.md) for the metric definitions and what is next.
 
+## Accounts and sync (optional)
+
+Without configuration the app is local-only. To enable magic-link accounts and cross-device sync:
+
+1. Create a free project at supabase.com. Choose the region deliberately (see docs/LEGAL.md).
+2. Dashboard > SQL > New query: paste and run `supabase/schema.sql`. This creates `profiles` and `sets`
+   with Row Level Security so each user can only touch their own rows, plus `delete_my_account()`.
+3. Dashboard > Authentication > URL configuration: Site URL `https://<user>.github.io/regain/`, and add
+   `https://<user>.github.io/regain/**` to Redirect URLs. Email provider: keep magic links on, passwords off.
+4. Dashboard > Project settings > API: copy the Project URL and the anon public key into `src/config.js`.
+   The anon key is safe to commit; security comes from RLS, not secrecy.
+5. Fill `OPERATOR` in `src/config.js` (name, contact email, region). It appears in the legal pages.
+6. Push. Home shows a Sign in chip; Account & sync has the consent checkbox, sync, sign out and delete.
+
+Free-tier email sending is rate limited (a few sign-in emails per hour). For more than a handful of users,
+configure custom SMTP in Authentication > SMTP settings.
+
+Legal: the app ships a Privacy & Consumer Health Data Notice and Terms (`src/legal.js`) with versioned
+consent. `docs/LEGAL.md` records which laws apply and what the build does about them.
+
 ## Apple Watch (phase 2, scaffolded)
 
 There is no web API for Watch sensors and a native watchOS app needs Xcode/macOS. Workaround:

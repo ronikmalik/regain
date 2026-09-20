@@ -9,6 +9,9 @@ import { drawGauge } from './gauge.js';
 import { replayCard, overlayChart } from './replay.js';
 import { weeklySummary, calendarSvg, streakInfo, painInsight, painScatterSvg } from './insights.js';
 import { renderReport as renderTherapistReport } from './report.js';
+import * as cloud from './cloud.js';
+import { privacyHtml, termsHtml } from './legal.js';
+import { TERMS_VERSION, OPERATOR } from './config.js';
 import { figure, mountFigure } from './figures.js';
 
 const app = document.getElementById('app');
@@ -24,6 +27,24 @@ const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const MOUNT = () => MOUNTS[settings.mount] || MOUNTS.strap;
 
 let session = null; // active session state
+let user = null;     // signed-in user (cloud), or null
+let syncMsg = '';    // last sync status line
+cloud.onAuth(async (event, s) => {
+  user = s?.user || null;
+  if (user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+    try { await cloud.ensureProfile(user); await runSync(); } catch (e) { syncMsg = e.message; }
+  }
+  if (event === 'SIGNED_OUT') { user = null; syncMsg = ''; }
+  if (['home', 'account'].includes(currentScreen)) go(currentScreen);
+});
+let currentScreen = 'home';
+async function runSync(opts) {
+  if (!user) return;
+  try {
+    const r = await cloud.sync(user, opts);
+    syncMsg = r ? `Synced ${new Date(r.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '';
+  } catch (e) { syncMsg = 'Sync failed: ' + e.message; }
+}
 const REP_GOAL = () => settings.goal;
 
 // ---------- shared bits ----------
@@ -65,9 +86,10 @@ const lines = (arr) => `<ol class="steps">${arr.map((t) => `<li>${t}</li>`).join
 const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 // ---------- routing ----------
-const screens = { home, setup, live, summary, progress, viewSet, report };
+const screens = { home, setup, live, summary, progress, viewSet, report, privacy, terms, account };
 function report() { renderTherapistReport({ app, settings, header, go, holdGoal: HOLD_GOAL(), repGoal: REP_GOAL() }); }
 function go(name, arg) {
+  currentScreen = name;
   window.scrollTo(0, 0);
   app.querySelectorAll('.replay').forEach((el) => el.stop?.());
   app.classList.remove('live', 'haspad');
@@ -87,7 +109,7 @@ function home() {
   const recovery = latest.length ? Math.round(latest.reduce((a, b) => a + b, 0) / latest.length) : null;
 
   app.innerHTML = `
-    ${header({ right: sourceChip(settings.source === 'sim' ? 'warn' : 'ok') })}
+    ${header({ right: `<button class="chip ${user ? 'ok' : ''}" id="acct" style="cursor:pointer"><span class="dot"></span>${user ? 'Synced' : cloud.isConfigured() ? 'Sign in' : 'Local'}</button>` })}
     <div class="hero">
       <div class="stat"><div class="v">${setsToday}</div><div class="l">Sets today</div></div>
       <div class="stat"><div class="v">${streak}<small>d</small></div><div class="l">Streak</div></div>
@@ -112,8 +134,13 @@ function home() {
     `).join('')}
     <div class="row" style="margin-top:18px"><button class="outline" id="progress" style="width:100%">Progress &amp; history${sessions.length ? ` · ${sessions.length} sets` : ''}</button></div>
     <p class="muted" style="text-align:center;margin-top:16px">Not medical advice. Follow your therapist's plan.</p>
+    <p class="muted" style="text-align:center"><a href="#" id="lnk-privacy">Privacy &amp; health data notice</a> · <a href="#" id="lnk-terms">Terms</a> · <a href="#" id="lnk-account">Account</a></p>
   `;
   app.querySelector('#progress').onclick = () => go('progress');
+  app.querySelector('#acct').onclick = () => go('account');
+  app.querySelector('#lnk-privacy').onclick = (e) => { e.preventDefault(); go('privacy'); };
+  app.querySelector('#lnk-terms').onclick = (e) => { e.preventDefault(); go('terms'); };
+  app.querySelector('#lnk-account').onclick = (e) => { e.preventDefault(); go('account'); };
   segment(app.querySelector('#hand'), (v) => { settings.hand = v; saveSettings(settings); });
   segment(app.querySelector('#mount'), (v) => { settings.mount = v; saveSettings(settings); });
   segment(app.querySelector('#source'), (v) => { settings.source = v; saveSettings(settings); home(); });
@@ -145,6 +172,67 @@ function overviewHtml(all) {
       ${calendarSvg(all)}
       <div class="legend"><span>less</span><i class="sw cal n0"></i><i class="sw cal n1"></i><i class="sw cal n2"></i><i class="sw cal n3"></i><span>more</span></div>
     </div>`;
+}
+
+function privacy() {
+  app.innerHTML = `${header({ title: 'Privacy & health data', right: `<span class="chip">v${TERMS_VERSION}</span>` })}<div class="card doc legal">${privacyHtml()}</div>`;
+  app.querySelector('#back').onclick = () => history.length > 1 ? history.back() : go('home');
+}
+function terms() {
+  app.innerHTML = `${header({ title: 'Terms of use', right: `<span class="chip">v${TERMS_VERSION}</span>` })}<div class="card doc legal">${termsHtml()}</div>`;
+  app.querySelector('#back').onclick = () => history.length > 1 ? history.back() : go('home');
+}
+
+function account() {
+  const n = loadSessions().length;
+  const st = cloud.syncState();
+  app.innerHTML = `
+    ${header({ title: 'Account & sync', right: `<span class="chip ${user ? 'ok' : ''}"><span class="dot"></span>${user ? 'Signed in' : 'Local only'}</span>` })}
+    ${!cloud.isConfigured() ? `<div class="card"><span class="eyebrow">Sync not configured</span><p>This build runs locally only. Your ${n} sets are stored in this browser. To enable accounts, set the Supabase URL and anon key in <code>src/config.js</code> and run <code>supabase/schema.sql</code> (see README).</p></div>` : user ? `
+    <div class="card">
+      <span class="eyebrow">Signed in</span>
+      <div class="kvgrid">
+        <div><span>Email</span><b>${user.email}</b></div>
+        <div><span>Sets on this device</span><b>${n}</b></div>
+        <div><span>Last sync</span><b>${st.lastPull ? new Date(st.lastPull).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'never'}</b></div>
+      </div>
+      <p class="muted" id="syncmsg">${syncMsg}</p>
+      <div class="row"><button class="small primary" id="sync">Sync now</button><button class="small outline" id="fullsync">Full re-sync</button><button class="small ghost" id="signout">Sign out</button></div>
+    </div>
+    <div class="card">
+      <span class="eyebrow">Your data</span>
+      <p class="muted">Export everything from Progress > Therapist report > Copy JSON. Deleting your account removes all synced sets and your sign-in record immediately; data on this device is kept until you clear it.</p>
+      <button class="small ghost danger" id="delacct">Delete account and synced data</button>
+    </div>` : `
+    <div class="card">
+      <span class="eyebrow">Sign in to sync</span>
+      <p class="muted">Optional. Keeps your sets if you change phones and lets you sync between devices. We email you a one-time sign-in link; there is no password.</p>
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email" style="margin:6px 0">
+      <label class="consent"><input type="checkbox" id="consent"> <span>I am 18 or older and I agree to the <a href="#" id="c-terms">Terms</a> and consent to the collection of my health data as described in the <a href="#" id="c-privacy">Privacy &amp; health data notice</a>.</span></label>
+      <div id="err"></div>
+      <button class="primary block" id="signin">Email me a sign-in link</button>
+      <p class="muted">Without an account, nothing leaves this device.</p>
+    </div>`}
+    <div class="card"><span class="eyebrow">About</span><p class="muted">Regain ${TERMS_VERSION} · operator: ${OPERATOR.name || 'not set'}${OPERATOR.region ? ' · ' + OPERATOR.region : ''}${OPERATOR.email ? ' · ' + OPERATOR.email : ''}. <a href="#" id="a-privacy">Privacy &amp; health data notice</a> · <a href="#" id="a-terms">Terms</a></p></div>
+  `;
+  app.querySelector('#back').onclick = () => go('home');
+  for (const [id, scr] of [['a-privacy', 'privacy'], ['a-terms', 'terms'], ['c-privacy', 'privacy'], ['c-terms', 'terms']]) app.querySelector('#' + id)?.addEventListener('click', (e) => { e.preventDefault(); go(scr); });
+  app.querySelector('#signin')?.addEventListener('click', async () => {
+    const email = app.querySelector('#email').value.trim(), consent = app.querySelector('#consent').checked, btn = app.querySelector('#signin');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { app.querySelector('#err').innerHTML = '<div class="card error">Enter a valid email address.</div>'; return; }
+    btn.disabled = true; btn.textContent = 'Sending';
+    try { await cloud.signIn(email, consent); app.querySelector('#err').innerHTML = '<div class="card" style="border-color:var(--good)">Check your email and open the link on this device. The link expires in an hour.</div>'; btn.textContent = 'Link sent'; }
+    catch (e) { btn.disabled = false; btn.textContent = 'Email me a sign-in link'; app.querySelector('#err').innerHTML = `<div class="card error">${e.message}</div>`; }
+  });
+  app.querySelector('#sync')?.addEventListener('click', async () => { app.querySelector('#syncmsg').textContent = 'Syncing'; await runSync(); account(); });
+  app.querySelector('#fullsync')?.addEventListener('click', async () => { app.querySelector('#syncmsg').textContent = 'Syncing everything'; await runSync({ full: true }); account(); });
+  app.querySelector('#signout')?.addEventListener('click', async () => { await cloud.signOut(); user = null; go('home'); });
+  app.querySelector('#delacct')?.addEventListener('click', async () => {
+    const b = app.querySelector('#delacct');
+    if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to permanently delete'; return; }
+    b.disabled = true; b.textContent = 'Deleting';
+    try { await cloud.deleteAccount(); user = null; go('home'); } catch (e) { b.disabled = false; b.textContent = 'Delete failed: ' + e.message; }
+  });
 }
 
 function computeStreak(sessions) {
@@ -557,7 +645,7 @@ function renderReport(r, editable) {
   if (editable) {
     segment(app.querySelector('#pain'), (v) => { r.pain = Number(v); app.querySelector('#painv').textContent = `${r.pain} / 10`; });
     app.querySelector('#back').onclick = () => { session = null; go('home'); };
-    app.querySelector('#save').onclick = () => { saveSession(r); session = null; go('progress', r.exerciseId); };
+    app.querySelector('#save').onclick = async () => { saveSession(r); session = null; go('progress', r.exerciseId); if (user) { await runSync(); } };
     app.querySelector('#discard').onclick = () => { session = null; go('home'); };
   } else {
     app.querySelector('#back').onclick = () => go('progress', r.exerciseId);
@@ -678,7 +766,7 @@ function progress(selectedId) {
   };
   app.querySelector('#clear').onclick = () => {
     const b = app.querySelector('#clear');
-    if (b.dataset.armed) { clearSessions(); progress(id); return; }
+    if (b.dataset.armed) { cloud.markDeleted(loadSessions().map((s) => s.id)); clearSessions(); progress(id); if (user) runSync(); return; }
     b.dataset.armed = '1'; b.textContent = 'Tap again to confirm';
   };
 }

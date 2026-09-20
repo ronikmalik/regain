@@ -6,15 +6,17 @@ export function loadSessions() {
 }
 export function saveSession(s) {
   const all = loadSessions();
+  s.updatedAt = Date.now();
   all.push(s);
   try { localStorage.setItem(KEY, JSON.stringify(all)); } catch {}
 }
+export function replaceSessions(list) { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {} }
 export function clearSessions() { try { localStorage.removeItem(KEY); } catch {} }
 
 export function loadSettings() {
   try { return { hand: 'right', flips: {}, ...JSON.parse(localStorage.getItem(SETTINGS) || '{}') }; } catch { return { hand: 'right', flips: {} }; }
 }
-export function saveSettings(s) { try { localStorage.setItem(SETTINGS, JSON.stringify(s)); } catch {} }
+export function saveSettings(s) { s.savedAt = Date.now(); try { localStorage.setItem(SETTINGS, JSON.stringify(s)); } catch {} }
 
 export function exportCsv() {
   const rows = [['date', 'exercise', 'hand', 'reps', 'max_pos_deg', 'max_neg_deg', 'pain_0_10']];
