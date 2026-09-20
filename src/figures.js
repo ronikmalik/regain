@@ -197,7 +197,8 @@ const MOUNT_FIGS = {
     // pad zone in the lower middle of the screen + thumb lying flat across it
     const cx = px + pw / 2, cy = py + ph - 40;
     g += `<circle cx="${h.X(cx)}" cy="${cy}" r="30" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
-    g += h.line(px + pw + 30, py + ph - 2, px + pw - 10, py + ph - 26, 19, skin) + h.line(px + pw - 10, py + ph - 26, px + pw / 2 - 6, py + ph - 42, 16, skin);
+    // thumb comes straight up from below the bottom edge, beside the index finger, and lies over the screen up to the pad
+    g += h.line(px + pw - 16, py + ph + 10, px + pw - 14, py + ph - 10, 19, skin) + h.line(px + pw - 14, py + ph - 10, px + pw / 2 + 8, py + ph - 42, 16, skin);
     g += h.text(px + pw / 2, 214, 'fingers straight behind the phone', 'middle', 'var(--text-2)', 10);
     // inset: edge view, fingers horizontal, phone lying on them, thumb wrapped round the bottom edge, lying flat on the screen
     const ix = 196, iy = 120;
