@@ -196,8 +196,8 @@ const MOUNT_FIGS = {
     }
     // corner pad zone + thumb pinning it
     const cx = px + pw - 6, cy = py + ph - 8;
-    g += `<path d="M${h.X(cx)},${cy} L${h.X(cx)},${cy - 52} A52,52 0 0 ${h.X(1) > h.X(0) ? 0 : 1} ${h.X(cx - 52)},${cy} Z" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
-    g += h.line(px + pw + 34, py + ph - 2, px + pw - 4, py + ph - 14, 18, skin) + h.line(px + pw - 4, py + ph - 14, px + pw - 20, py + ph - 24, 15, skin);
+    g += `<path d="M${h.X(cx)},${cy} L${h.X(cx)},${cy - 60} A60,60 0 0 ${h.X(1) > h.X(0) ? 0 : 1} ${h.X(cx - 60)},${cy} Z" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    g += h.line(px + pw + 30, py + ph + 4, px + pw - 14, py + ph - 22, 19, skin) + h.line(px + pw - 14, py + ph - 22, px + pw - 40, py + ph - 44, 16, skin);
     g += h.text(px + pw / 2, 214, 'fingers straight behind the phone', 'middle', 'var(--text-2)', 10);
     // inset: edge view, fingers horizontal, phone lying on them, thumb pressing the far corner from above
     const ix = 196, iy = 120;
@@ -205,10 +205,10 @@ const MOUNT_FIGS = {
     g += h.line(ix - 4, iy + 12, ix + 88, iy + 12, 16, skin);                                          // fingers, pointing to the top of the phone
     g += `<rect x="${Math.min(h.X(ix), h.X(ix + 84))}" y="${iy - 1}" width="84" height="9" rx="3" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`; // phone lying flat
     g += `<line x1="${Math.min(h.X(ix + 3), h.X(ix + 81))}" y1="${iy - 1}" x2="${Math.max(h.X(ix + 3), h.X(ix + 81))}" y2="${iy - 1}" stroke="var(--good)" stroke-width="3" stroke-linecap="round"/>`; // screen up
-    g += h.line(ix + 2, iy - 34, ix + 8, iy - 8, 14, skin);                                            // thumb from above onto the near (bottom) corner
+    g += h.line(ix - 16, iy + 10, ix - 4, iy - 8, 12, skin) + h.line(ix - 4, iy - 8, ix + 34, iy - 8, 12, skin); // thumb wraps round the bottom edge and lies flat along the screen
     g += h.text(ix + 42, iy + 40, 'flat on the fingers', 'middle', 'var(--text-2)', 10);
-    g += h.text(ix + 42, iy + 54, 'thumb pins corner', 'middle', 'var(--text-2)', 10);
-    g += h.text(150, 228, 'Straight fingers · thumb on the corner pad', 'middle', 'var(--text-3)', 11);
+    g += h.text(ix + 42, iy + 54, 'thumb flat on the screen', 'middle', 'var(--text-2)', 10);
+    g += h.text(150, 228, 'Straight fingers · thumb flat across the corner pad', 'middle', 'var(--text-3)', 11);
     return g;
   },
 };

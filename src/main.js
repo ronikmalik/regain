@@ -165,7 +165,7 @@ function setup(ex) {
     </div>
     <div class="card"><span class="eyebrow">Before you start</span>${lines([
       'Tap Start with your other hand.',
-      MOUNT().pad ? 'Rest your thumb on the corner pad to begin the countdown.' : 'Get into the start position during the ' + MOUNT().countdown + ' second countdown.',
+      MOUNT().pad ? 'Lay your thumb flat over the corner pad to begin the countdown.' : 'Get into the start position during the ' + MOUNT().countdown + ' second countdown.',
       'Hold still until you hear "Go".',
       MOUNT().pad ? 'Reps only count while your thumb is on the pad.' : 'Nothing touches the screen during the set.',
       'Move slowly. Stop on sharp pain.',
