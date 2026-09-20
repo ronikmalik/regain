@@ -279,3 +279,24 @@ textarea { width: 100%; font: 12px var(--mono); background: var(--surface); colo
 .quality .q { font-family: var(--mono); font-size: 22px; font-weight: 700; line-height: 1.1; }
 .quality .k { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--mono); margin-top: 2px; }
 .quality .t { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+/* replay */
+.trace.full { height: 96px; border-top: 0; }
+.trace .rep.pos { fill: var(--accent); opacity: 0.10; }
+.trace .rep.neg { fill: var(--warn); opacity: 0.10; }
+.trace .holdwin { fill: var(--good); opacity: 0.2; }
+.trace .cursor { stroke: #fff; stroke-width: 1.5; }
+.readout .dir.hold { color: var(--good); }
+.rp-controls { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.rp-controls input[type="range"] { flex: 1; }
+.rp-controls .seg button { padding: 6px 9px; font-size: 12px; }
+
+/* overlay */
+.chart.compare .band { fill: var(--accent); opacity: 0.08; }
+.chart.compare .ov-a { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.chart.compare .ov-b { fill: none; stroke: var(--warn); stroke-width: 2; stroke-linejoin: round; }
+.legend .ov-a { background: var(--accent); }
+.legend .ov-b { background: var(--warn); }
+.ov-pick { display: flex; gap: 8px; margin: 6px 0 8px; }
+.ov-pick label { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ov-pick select { flex: 1; min-width: 0; padding: 8px 10px; font-size: 13px; }

@@ -5,6 +5,8 @@ import { RepDetector } from './reps.js';
 import { loadSessions, saveSession, clearSessions, loadSettings, saveSettings, exportCsv } from './store.js';
 import { timelineChart, projectionText } from './chart.js';
 import { computeMetrics } from './metrics.js';
+import { drawGauge } from './gauge.js';
+import { replayCard, overlayChart } from './replay.js';
 import { figure, mountFigure } from './figures.js';
 
 const app = document.getElementById('app');
@@ -64,6 +66,7 @@ const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(
 const screens = { home, setup, live, summary, progress, viewSet };
 function go(name, arg) {
   window.scrollTo(0, 0);
+  app.querySelectorAll('.replay').forEach((el) => el.stop?.());
   app.classList.remove('live', 'haspad');
   screens[name](arg);
   app.classList.remove('screen'); void app.offsetWidth; app.classList.add('screen');
@@ -422,46 +425,6 @@ function renderLive() {
   drawTrace(liveEls.trace, ex, session.trace);
 }
 
-// Semicircular gauge: neutral at the top, positive direction to the right.
-function drawGauge(svg, ex, angle) {
-  const cx = 150, cy = 148, r = 106;
-  const range = ex.neg ? Math.max(ex.normal.pos, ex.normal.neg) + 20 : ex.normal.pos + 20; // degrees per half-sweep
-  const lo = ex.neg ? -range : 0;
-  const toA = (deg) => (ex.neg ? deg / range : (deg / range) * 2 - 1) * (Math.PI / 2);
-  const toXY = (deg, rad = r) => { const a = toA(deg); return [cx + rad * Math.sin(a), cy - rad * Math.cos(a)]; };
-  const arc = (from, to, stroke, w = 14) => {
-    const [x1, y1] = toXY(from), [x2, y2] = toXY(to);
-    const large = Math.abs(to - from) / range > 1 ? 1 : 0;
-    const sweep = to > from ? 1 : 0;
-    return `<path d="M${x1},${y1} A${r},${r} 0 ${large} ${sweep} ${x2},${y2}" fill="none" stroke="${stroke}" stroke-width="${w}" stroke-linecap="round"/>`;
-  };
-  const clamp = (v) => Math.max(lo, Math.min(range, v));
-  let html = arc(lo, range, 'var(--surface-3)');
-  // minor ticks every 10°, major every 30°
-  const step = 10;
-  for (let d = Math.ceil(lo / step) * step; d <= range; d += step) {
-    const major = d % 30 === 0;
-    const [x1, y1] = toXY(d, r + 12), [x2, y2] = toXY(d, r + (major ? 20 : 16));
-    html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${major ? 'var(--text-3)' : 'var(--border-2)'}" stroke-width="1.5"/>`;
-    if (major && d !== 0) { const [tx, ty] = toXY(d, r + 30); html += `<text x="${tx}" y="${ty + 3}" text-anchor="middle" font-size="9" font-family="var(--mono)" fill="var(--text-3)">${Math.abs(d)}</text>`; }
-  }
-  // target bands
-  const band = (from, to) => arc(from, to, 'var(--accent-soft)', 14);
-  html += band(0, ex.normal.pos);
-  if (ex.neg) html += band(-ex.normal.neg, 0);
-  const a = clamp(angle);
-  if (Math.abs(a) > 0.5) html += arc(0, a, 'var(--accent)', 14);
-  const tgt = (deg) => { const [x1, y1] = toXY(deg, r - 12), [x2, y2] = toXY(deg, r + 8); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--good)" stroke-width="2.5" stroke-linecap="round"/>`; };
-  html += tgt(ex.normal.pos);
-  if (ex.neg) html += tgt(-ex.normal.neg);
-  const [nx, ny] = toXY(a);
-  html += `<circle cx="${nx}" cy="${ny}" r="13" fill="var(--accent)" opacity="0.25"/><circle cx="${nx}" cy="${ny}" r="8" fill="#fff"/>`;
-  // zero marker
-  const [zx, zy] = toXY(0, r + 24);
-  html += `<text x="${zx}" y="${zy}" text-anchor="middle" font-size="9" font-family="var(--mono)" fill="var(--text-3)">0</text>`;
-  svg.innerHTML = html;
-}
-
 // Rolling 8-second strip chart of the angle, like a monitor trace.
 function drawTrace(svg, ex, trace) {
   const W = 320, H = 84, pad = 6;
@@ -544,6 +507,7 @@ function renderReport(r, editable) {
       <span class="eyebrow">Peak per rep</span>
       ${reps.length ? repsChart(ex, reps) : '<p class="muted">No reps detected. A rep must pass 12° and return to neutral.</p>'}
     </div>
+    <div id="replay-slot"></div>
     <div class="card report">
       <span class="eyebrow">Details</span>
       <div class="kv"><span>Exercise</span><b>${ex.joint} · ${ex.name}</b></div>
@@ -563,6 +527,7 @@ function renderReport(r, editable) {
     <button class="primary block" id="save">Save to history</button>
     <button class="block ghost" id="discard">Discard</button>` : `<button class="block outline" id="toprog">Back to progress</button>`}
   `;
+  if (r.samples?.length) app.querySelector('#replay-slot').replaceWith(replayCard(r, ex));
   if (editable) {
     segment(app.querySelector('#pain'), (v) => { r.pain = Number(v); app.querySelector('#painv').textContent = `${r.pain} / 10`; });
     app.querySelector('#back').onclick = () => { session = null; go('home'); };
@@ -639,6 +604,30 @@ function progress(selectedId) {
     if (ex.neg) block(ex.neg, 'maxNeg', ex.normal.neg);
     if (mine.some((s) => s.avgHold != null)) block('Average hold', 'avgHold', HOLD_GOAL(), 's', { band: false, project: false, miles: false });
     if (mine.some((s) => s.samples?.length)) block('Smoothness', 'smooth', 100, '', { band: false, project: false, miles: false });
+    const withTrace = mine.filter((s) => s.samples?.length > 20);
+    if (withTrace.length >= 2) {
+      const wrap = document.createElement('div'); wrap.className = 'card';
+      const opt = (sel) => withTrace.map((s, i) => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${new Date(s.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })} · ${s.maxPos}°${ex.neg ? ' / ' + s.maxNeg + '°' : ''}</option>`).join('');
+      let aId = withTrace[0].id, bId = withTrace.at(-1).id;
+      const draw = () => {
+        const A = withTrace.find((s) => s.id === aId), B = withTrace.find((s) => s.id === bId);
+        const lbl = (s) => new Date(s.ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+        wrap.querySelector('#ov-chart').replaceChildren(overlayChart(ex, { label: lbl(A), samples: A.samples }, { label: lbl(B), samples: B.samples }));
+        wrap.querySelector('#ov-a-l').textContent = `${lbl(A)} · ${A.maxPos}°${ex.neg ? ' / ' + A.maxNeg + '°' : ''}`;
+        wrap.querySelector('#ov-b-l').textContent = `${lbl(B)} · ${B.maxPos}°${ex.neg ? ' / ' + B.maxNeg + '°' : ''}`;
+        const d = B.maxPos - A.maxPos, dh = (B.avgHold ?? 0) - (A.avgHold ?? 0), ds = (B.metrics?.smooth ?? 0) - (A.metrics?.smooth ?? 0);
+        wrap.querySelector('#ov-txt').textContent = `${ex.pos} ${d >= 0 ? '+' : ''}${d}°${ex.neg ? `, ${ex.neg} ${B.maxNeg - A.maxNeg >= 0 ? '+' : ''}${B.maxNeg - A.maxNeg}°` : ''}, hold ${dh >= 0 ? '+' : ''}${dh.toFixed(1)}s, smoothness ${ds >= 0 ? '+' : ''}${ds} between these two sets.`;
+      };
+      wrap.innerHTML = `<span class="eyebrow">Compare two sets</span>
+        <div class="ov-pick"><label><i class="sw ov-a"></i><select id="ov-a">${opt(aId)}</select></label><label><i class="sw ov-b"></i><select id="ov-b">${opt(bId)}</select></label></div>
+        <div id="ov-chart"></div>
+        <div class="legend"><span><i class="sw ov-a"></i> <span id="ov-a-l"></span></span><span><i class="sw ov-b"></i> <span id="ov-b-l"></span></span><span><i class="sw band"></i> normal range</span></div>
+        <p class="insight" id="ov-txt"></p>`;
+      wrap.querySelector('#ov-a').onchange = (e) => { aId = e.target.value; draw(); };
+      wrap.querySelector('#ov-b').onchange = (e) => { bId = e.target.value; draw(); };
+      charts.appendChild(wrap);
+      draw();
+    }
     app.querySelector('#table').innerHTML = `<div class="card"><span class="eyebrow">Session log</span><table><thead><tr><th>Date</th><th>Reps</th><th>${ex.pos}</th>${ex.neg ? `<th>${ex.neg}</th>` : ''}<th>Hold</th><th>Pain</th></tr></thead><tbody>
       ${mine.slice().reverse().map((s) => `<tr><td>${new Date(s.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${s.reps.length}</td><td>${s.maxPos}°</td>${ex.neg ? `<td>${s.maxNeg}°</td>` : ''}<td>${s.avgHold != null ? s.avgHold.toFixed(1) + 's' : '–'}</td><td>${s.pain ?? '–'}</td></tr>`).join('')}
     </tbody></table></div>`;

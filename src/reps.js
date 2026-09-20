@@ -24,7 +24,7 @@ export class RepDetector {
     if (this.dir === 0) {
       if (Math.abs(angle) >= this.start) {
         this.dir = Math.sign(angle); this.peak = Math.abs(angle);
-        this._t0 = t; this._hist = [[t, this.peak]]; this._holdStart = null; this._bestHold = 0;
+        this._t0 = t; this._hist = [[t, this.peak]]; this._holdStart = null; this._bestHold = 0; this._holdFrom = null; this._holdTo = null;
       }
       return null;
     }
@@ -36,11 +36,16 @@ export class RepDetector {
     const [t0, a0] = this._hist[0];
     const speed = t - t0 >= this.speedWindow * 0.5 ? Math.abs(a - a0) / ((t - t0) / 1000) : Infinity;
     const atPeak = a >= this.peak - this.holdBand && speed < this.holdSpeed;
-    if (atPeak) { if (this._holdStart == null) this._holdStart = t; this._bestHold = Math.max(this._bestHold, (t - this._holdStart) / 1000); }
+    if (atPeak) {
+      if (this._holdStart == null) this._holdStart = t;
+      const h = (t - this._holdStart) / 1000;
+      if (h > this._bestHold) { this._bestHold = h; this._holdFrom = this._holdStart; this._holdTo = t; }
+    }
     else this._holdStart = null;
 
     if (a <= this.end) {
-      const rep = { dir: this.dir, peak: Math.round(this.peak), hold: Math.round(this._bestHold * 10) / 10, duration: Math.round((t - this._t0) / 100) / 10 };
+      const rep = { dir: this.dir, peak: Math.round(this.peak), hold: Math.round(this._bestHold * 10) / 10, duration: Math.round((t - this._t0) / 100) / 10, t0: Math.round(this._t0), t1: Math.round(t) };
+      if (this._holdFrom != null) { rep.holdFrom = Math.round(this._holdFrom); rep.holdTo = Math.round(this._holdTo); }
       this.reps.push(rep);
       this.dir = 0; this.peak = 0; this._holdStart = null;
       return rep;
