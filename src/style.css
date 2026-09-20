@@ -259,3 +259,23 @@ textarea { width: 100%; font: 12px var(--mono); background: var(--surface); colo
 .reps-chart.hold rect.met { fill: var(--good); }
 .reps-chart.hold rect.short { fill: var(--warn); }
 .legend .good { background: var(--good); }
+
+/* timeline chart */
+.chart.timeline .band { fill: var(--good); opacity: 0.08; }
+.chart.timeline .median { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; opacity: 0.85; }
+.chart.timeline .mile { stroke: var(--good); stroke-width: 1.5; stroke-dasharray: 2 3; }
+.chart.timeline .mile-lbl { fill: var(--good); font-family: var(--mono); font-size: 10px; font-weight: 700; }
+.chart.timeline .proj { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; opacity: 0.8; }
+.chart.timeline .proj-dot { fill: var(--bg); stroke: var(--accent); stroke-width: 2; }
+.chart.timeline .bar { cursor: pointer; }
+.chart.timeline .hit { cursor: pointer; }
+.legend .med { background: var(--text); height: 2px; }
+.legend .band { background: var(--good); opacity: 0.35; height: 8px; }
+.legend .proj { background: repeating-linear-gradient(90deg, var(--accent) 0 4px, transparent 4px 7px); height: 2px; }
+.insight { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 8px; color: var(--text); font-size: 13px; }
+
+/* movement quality grid */
+.quality { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 12px; margin-top: 4px; }
+.quality .q { font-family: var(--mono); font-size: 22px; font-weight: 700; line-height: 1.1; }
+.quality .k { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--mono); margin-top: 2px; }
+.quality .t { font-size: 11px; color: var(--text-3); margin-top: 1px; }

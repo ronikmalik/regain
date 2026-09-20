@@ -63,9 +63,9 @@ All computed on device, per set, at save time (cached on the session object).
 - No streak shaming. Missed days are shown as gaps, not as red marks.
 
 ## 5. Order of work
-1. Metrics module (`src/metrics.js`): smoothness, symmetry, time to peak, fatigue slope, active range. Unit tests on synthetic traces.
-2. Timeline card with rolling median, normal band, milestones and projection.
-3. Set report gets smoothness and time to peak; tapping a bar opens it.
+1. DONE: Metrics module (`src/metrics.js`): smoothness, symmetry, time to peak, fatigue slope, active range. Unit tests on synthetic traces.
+2. DONE: Timeline card with rolling median, normal band, milestones and projection.
+3. DONE: Set report gets smoothness and time to peak; tapping a bar opens it.
 4. Replay and overlay.
 5. Calendar, pain correlation, weekly summary.
 6. Therapist report, then sync.

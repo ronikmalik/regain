@@ -3,7 +3,8 @@ import { PhoneSource, SimSource, WatchSource } from './motion.js';
 import { relative, twistDeg } from './quat.js';
 import { RepDetector } from './reps.js';
 import { loadSessions, saveSession, clearSessions, loadSettings, saveSettings, exportCsv } from './store.js';
-import { romChart } from './chart.js';
+import { timelineChart, projectionText } from './chart.js';
+import { computeMetrics } from './metrics.js';
 import { figure, mountFigure } from './figures.js';
 
 const app = document.getElementById('app');
@@ -60,7 +61,7 @@ const lines = (arr) => `<ol class="steps">${arr.map((t) => `<li>${t}</li>`).join
 const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 // ---------- routing ----------
-const screens = { home, setup, live, summary, progress };
+const screens = { home, setup, live, summary, progress, viewSet };
 function go(name, arg) {
   window.scrollTo(0, 0);
   app.classList.remove('live', 'haspad');
@@ -484,28 +485,60 @@ function drawTrace(svg, ex, trace) {
 function summary() {
   const { ex, det, startedAt } = session;
   const secs = Math.round((Date.now() - startedAt) / 1000);
-  const maxPos = Math.round(det.maxPos), maxNeg = Math.round(det.maxNeg);
   const reps = det.reps;
-  const goalHit = reps.length >= REP_GOAL();
-  const avgHold = Math.round(avg(reps.map((r) => r.hold)) * 10) / 10;
-  const holdsMet = reps.filter((r) => r.hold >= HOLD_GOAL()).length;
-  let pain = 0;
+  const record = {
+    id: crypto.randomUUID?.() || String(Date.now()), ts: startedAt, exerciseId: ex.id, hand: settings.hand, source: settings.source, mount: settings.mount,
+    reps, maxPos: Math.round(det.maxPos), maxNeg: Math.round(det.maxNeg), avgHold: Math.round(avg(reps.map((r) => r.hold)) * 10) / 10,
+    holdGoal: HOLD_GOAL(), repGoal: REP_GOAL(), pain: 0, durationS: secs, samples: session.samples,
+  };
+  record.metrics = computeMetrics(record, HOLD_GOAL());
+  speak(`Set complete. ${reps.length} reps. Best ${ex.pos} ${record.maxPos}${ex.neg ? `, best ${ex.neg} ${record.maxNeg}` : ''}.`);
+  renderReport(record, true);
+}
+
+// Read-only view of a saved set (from the timeline).
+function viewSet(id) {
+  const s = loadSessions().find((x) => x.id === id);
+  if (!s) return go('progress');
+  if (!s.metrics && s.samples) s.metrics = computeMetrics(s, s.holdGoal ?? HOLD_GOAL());
+  renderReport(s, false);
+}
+
+function renderReport(r, editable) {
+  const ex = byId(r.exerciseId);
+  const reps = r.reps || [];
+  const repGoal = r.repGoal ?? REP_GOAL(), holdGoal = r.holdGoal ?? HOLD_GOAL();
+  const goalHit = reps.length >= repGoal;
+  const holdsMet = reps.filter((x) => x.hold >= holdGoal).length;
+  const mt = r.metrics || {};
+  const fmtMs = (ms) => (ms == null ? '–' : ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms');
   app.innerHTML = `
-    ${header({ title: 'Session report', right: `<span class="chip ${goalHit ? 'ok' : ''}"><span class="dot"></span>${goalHit ? 'Goal met' : 'Complete'}</span>` })}
+    ${header({ title: editable ? 'Session report' : 'Saved set', right: `<span class="chip ${goalHit ? 'ok' : ''}"><span class="dot"></span>${goalHit ? 'Goal met' : editable ? 'Complete' : new Date(r.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>` })}
     <div class="tiles" style="margin-top:0">
-      <div class="tile"><div class="v">${reps.length}</div><div class="l">reps</div><div class="t">goal ${REP_GOAL()}</div></div>
-      <div class="tile"><div class="v">${maxPos}°</div><div class="l">${ex.pos}</div><div class="t">${pctOf(maxPos, ex.normal.pos)}% of ${ex.normal.pos}°</div></div>
-      ${ex.neg ? `<div class="tile"><div class="v">${maxNeg}°</div><div class="l">${ex.neg}</div><div class="t">${pctOf(maxNeg, ex.normal.neg)}% of ${ex.normal.neg}°</div></div>` : `<div class="tile"><div class="v">${fmtTime(secs)}</div><div class="l">duration</div></div>`}
+      <div class="tile"><div class="v">${reps.length}</div><div class="l">reps</div><div class="t">goal ${repGoal}</div></div>
+      <div class="tile"><div class="v">${r.maxPos}°</div><div class="l">${ex.pos}</div><div class="t">${pctOf(r.maxPos, ex.normal.pos)}% of ${ex.normal.pos}°</div></div>
+      ${ex.neg ? `<div class="tile"><div class="v">${r.maxNeg}°</div><div class="l">${ex.neg}</div><div class="t">${pctOf(r.maxNeg, ex.normal.neg)}% of ${ex.normal.neg}°</div></div>` : `<div class="tile"><div class="v">${fmtTime(r.durationS)}</div><div class="l">duration</div></div>`}
+    </div>
+    <div class="card">
+      <span class="eyebrow">Movement quality</span>
+      <div class="quality">
+        <div><div class="q">${mt.smooth ?? '–'}</div><div class="k">smoothness</div><div class="t">100 = one clean motion per rep</div></div>
+        <div><div class="q">${fmtMs(mt.ttp)}</div><div class="k">time to peak</div><div class="t">neutral to 90% of peak</div></div>
+        ${ex.neg ? `<div><div class="q">${mt.symmetry ?? '–'}${mt.symmetry != null ? '%' : ''}</div><div class="k">symmetry</div><div class="t">${ex.pos} vs ${ex.neg}</div></div>` : ''}
+        <div><div class="q">${mt.fatigue == null ? '–' : (mt.fatigue > 0 ? '+' : '') + mt.fatigue + '°'}</div><div class="k">per rep</div><div class="t">${mt.fatigue == null ? 'needs 3 reps' : mt.fatigue < -1 ? 'fading across the set' : 'holding up across the set'}</div></div>
+        <div><div class="q">${mt.active ? mt.active.pos + '°' : '–'}</div><div class="k">held ${ex.pos.toLowerCase()}</div><div class="t">best rep that met the hold</div></div>
+        ${ex.neg ? `<div><div class="q">${mt.active ? mt.active.neg + '°' : '–'}</div><div class="k">held ${ex.neg.toLowerCase()}</div><div class="t">best rep that met the hold</div></div>` : ''}
+      </div>
     </div>
     <div class="card">
       <span class="eyebrow">Range vs. normal</span>
-      <div class="row" style="margin-top:4px"><span>${ex.pos}</span><span class="mono muted">${maxPos}° / ${ex.normal.pos}°</span></div>
-      <div class="bar"><i style="width:${pctOf(maxPos, ex.normal.pos)}%"></i></div>
-      ${ex.neg ? `<div class="row" style="margin-top:12px"><span>${ex.neg}</span><span class="mono muted">${maxNeg}° / ${ex.normal.neg}°</span></div><div class="bar"><i style="width:${pctOf(maxNeg, ex.normal.neg)}%"></i></div>` : ''}
+      <div class="row" style="margin-top:4px"><span>${ex.pos}</span><span class="mono muted">${r.maxPos}° / ${ex.normal.pos}°</span></div>
+      <div class="bar"><i style="width:${pctOf(r.maxPos, ex.normal.pos)}%"></i></div>
+      ${ex.neg ? `<div class="row" style="margin-top:12px"><span>${ex.neg}</span><span class="mono muted">${r.maxNeg}° / ${ex.normal.neg}°</span></div><div class="bar"><i style="width:${pctOf(r.maxNeg, ex.normal.neg)}%"></i></div>` : ''}
     </div>
     <div class="card">
-      <div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Hold per rep</span><span class="mono muted">avg ${avgHold}s · ${holdsMet} of ${reps.length} met ${HOLD_GOAL()}s</span></div>
-      ${reps.length ? holdChart(reps) : '<p class="muted">No reps detected.</p>'}
+      <div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Hold per rep</span><span class="mono muted">avg ${r.avgHold ?? 0}s · ${holdsMet} of ${reps.length} met ${holdGoal}s</span></div>
+      ${reps.length ? holdChart(reps, holdGoal) : '<p class="muted">No reps detected.</p>'}
     </div>
     <div class="card">
       <span class="eyebrow">Peak per rep</span>
@@ -514,33 +547,35 @@ function summary() {
     <div class="card report">
       <span class="eyebrow">Details</span>
       <div class="kv"><span>Exercise</span><b>${ex.joint} · ${ex.name}</b></div>
-      <div class="kv"><span>Side</span><b>${settings.hand}</b></div>
-      <div class="kv"><span>Duration</span><b>${fmtTime(secs)}</b></div>
-      <div class="kv"><span>Sensor</span><b>${SOURCE_LABEL[settings.source]}</b></div>
-      <div class="kv"><span>Mount</span><b>${MOUNT().short}</b></div>
-      <div class="kv"><span>Recorded</span><b>${new Date(startedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</b></div>
+      <div class="kv"><span>Side</span><b>${r.hand}</b></div>
+      <div class="kv"><span>Duration</span><b>${fmtTime(r.durationS)}</b></div>
+      <div class="kv"><span>Sensor</span><b>${SOURCE_LABEL[r.source] || r.source}</b></div>
+      <div class="kv"><span>Mount</span><b>${MOUNTS[r.mount]?.short || '–'}</b></div>
+      <div class="kv"><span>Recorded</span><b>${new Date(r.ts).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</b></div>
+      ${!editable ? `<div class="kv"><span>Pain</span><b>${r.pain ?? '–'} / 10</b></div>` : ''}
     </div>
-    <div class="card">
+    ${editable ? `<div class="card">
       <div class="row" style="margin:0"><span class="eyebrow" style="margin:0">Pain during set</span><b class="mono" id="painv">0 / 10</b></div>
       <div class="pain" id="pain">${Array.from({ length: 11 }, (_, i) => `<button aria-pressed="${i === 0}" data-v="${i}" class="${i >= 7 ? 'hi' : i >= 4 ? 'mid' : ''}">${i}</button>`).join('')}</div>
       <div class="pain-scale"><span>none</span><span>moderate</span><span>severe</span></div>
       <p class="muted">Report pain above 4, or any sharp pain, to your therapist.</p>
     </div>
     <button class="primary block" id="save">Save to history</button>
-    <button class="block ghost" id="discard">Discard</button>
+    <button class="block ghost" id="discard">Discard</button>` : `<button class="block outline" id="toprog">Back to progress</button>`}
   `;
-  speak(`Set complete. ${reps.length} reps. Best ${ex.pos} ${maxPos}${ex.neg ? `, best ${ex.neg} ${maxNeg}` : ''}.`);
-  segment(app.querySelector('#pain'), (v) => { pain = Number(v); app.querySelector('#painv').textContent = `${pain} / 10`; });
-  app.querySelector('#back').onclick = () => { session = null; go('home'); };
-  app.querySelector('#save').onclick = () => {
-    saveSession({ id: crypto.randomUUID?.() || String(Date.now()), ts: startedAt, exerciseId: ex.id, hand: settings.hand, source: settings.source, mount: settings.mount, reps, maxPos, maxNeg, avgHold, holdGoal: HOLD_GOAL(), pain, durationS: secs, samples: session.samples });
-    session = null; go('progress', ex.id);
-  };
-  app.querySelector('#discard').onclick = () => { session = null; go('home'); };
+  if (editable) {
+    segment(app.querySelector('#pain'), (v) => { r.pain = Number(v); app.querySelector('#painv').textContent = `${r.pain} / 10`; });
+    app.querySelector('#back').onclick = () => { session = null; go('home'); };
+    app.querySelector('#save').onclick = () => { saveSession(r); session = null; go('progress', r.exerciseId); };
+    app.querySelector('#discard').onclick = () => { session = null; go('home'); };
+  } else {
+    app.querySelector('#back').onclick = () => go('progress', r.exerciseId);
+    app.querySelector('#toprog').onclick = () => go('progress', r.exerciseId);
+  }
 }
 
-function holdChart(reps) {
-  const W = 320, H = 64, goal = HOLD_GOAL(), max = Math.max(goal * 1.3, ...reps.map((r) => r.hold));
+function holdChart(reps, goal = HOLD_GOAL()) {
+  const W = 320, H = 64, max = Math.max(goal * 1.3, ...reps.map((r) => r.hold));
   const slot = (W - 8) / reps.length, bw = Math.min(22, slot - 4);
   const y = (v) => H - 14 - (v / max) * (H - 18);
   const bars = reps.map((r, i) => {
@@ -586,21 +621,24 @@ function progress(selectedId) {
   if (!mine.length) {
     charts.innerHTML = `<div class="card"><p>No sets yet.</p></div>`;
   } else {
-    const block = (label, key, target) => {
+    const pts = (key) => mine.map((s) => ({ id: s.id, ts: s.ts, value: key === 'avgHold' ? (s.avgHold ?? 0) : key === 'smooth' ? (s.metrics?.smooth ?? computeMetrics(s, s.holdGoal).smooth ?? 0) : s[key], reps: s.reps.length, pain: s.pain }));
+    const open = (p) => go('viewSet', p.id);
+    const block = (label, key, target, unit = '°', opts = {}) => {
+      const points = pts(key);
       const wrap = document.createElement('div'); wrap.className = 'card';
-      const latest = mine.at(-1)[key], first = mine[0][key];
-      wrap.innerHTML = `<div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">${label} · best per set</span><span class="mono muted">${first}° → ${latest}° · ${pctOf(latest, target)}% of normal</span></div>`;
-      wrap.appendChild(romChart({ label, target, sessions: mine.map((s) => ({ ts: s.ts, value: s[key], reps: s.reps.length, pain: s.pain })) }));
+      const latest = points.at(-1).value, first = points[0].value;
+      const { svg, proj } = timelineChart({ points, target, label, unit, onSelect: open, ...opts });
+      const headline = unit === '°' ? `${first}° → ${latest}° · ${pctOf(latest, target)}% of normal` : `${first}${unit} → ${latest}${unit}`;
+      wrap.innerHTML = `<div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">${label}</span><span class="mono muted">${headline}</span></div>`;
+      wrap.appendChild(svg);
+      const txt = unit === '°' ? projectionText(proj, target, unit, label) : null;
+      wrap.insertAdjacentHTML('beforeend', `<div class="legend"><span><i class="sw pos"></i> best per set</span><span><i class="sw med"></i> 7-day median</span><span><i class="sw band"></i> normal range</span>${proj?.etaTs ? '<span><i class="sw proj"></i> projection</span>' : ''}</div>${txt ? `<p class="insight">${txt}</p>` : ''}<p class="muted" style="text-align:center;margin:4px 0 0">Tap a bar to open that set.</p>`);
       charts.appendChild(wrap);
     };
     block(ex.pos, 'maxPos', ex.normal.pos);
     if (ex.neg) block(ex.neg, 'maxNeg', ex.normal.neg);
-    if (mine.some((s) => s.avgHold != null)) {
-      const wrap = document.createElement('div'); wrap.className = 'card';
-      wrap.innerHTML = `<div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Average hold per set</span><span class="mono muted">goal ${HOLD_GOAL()}s</span></div>`;
-      wrap.appendChild(romChart({ label: 'Average hold', target: HOLD_GOAL(), unit: 's', sessions: mine.map((s) => ({ ts: s.ts, value: s.avgHold ?? 0, reps: s.reps.length, pain: s.pain })) }));
-      charts.appendChild(wrap);
-    }
+    if (mine.some((s) => s.avgHold != null)) block('Average hold', 'avgHold', HOLD_GOAL(), 's', { band: false, project: false, miles: false });
+    if (mine.some((s) => s.samples?.length)) block('Smoothness', 'smooth', 100, '', { band: false, project: false, miles: false });
     app.querySelector('#table').innerHTML = `<div class="card"><span class="eyebrow">Session log</span><table><thead><tr><th>Date</th><th>Reps</th><th>${ex.pos}</th>${ex.neg ? `<th>${ex.neg}</th>` : ''}<th>Hold</th><th>Pain</th></tr></thead><tbody>
       ${mine.slice().reverse().map((s) => `<tr><td>${new Date(s.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${s.reps.length}</td><td>${s.maxPos}°</td>${ex.neg ? `<td>${s.maxNeg}°</td>` : ''}<td>${s.avgHold != null ? s.avgHold.toFixed(1) + 's' : '–'}</td><td>${s.pain ?? '–'}</td></tr>`).join('')}
     </tbody></table></div>`;
