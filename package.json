@@ -1,0 +1,19 @@
+{
+  "name": "regain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Phone/Watch motion-tracked physical therapy for wrist, hand and arm recovery",
+  "scripts": {
+    "dev": "vite --host",
+    "dev:http": "cross-env NO_HTTPS=1 vite --port 5174",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "relay": "node relay/server.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.0.0",
+    "cross-env": "^10.1.0",
+    "vite": "^7.0.0"
+  }
+}

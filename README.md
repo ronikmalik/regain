@@ -1,0 +1,63 @@
+# Regain
+
+Motion-tracked physical therapy for wrist, hand and arm recovery. Your phone (or Apple Watch)
+becomes a digital goniometer: it measures joint angle from the built-in gyroscope/accelerometer,
+counts reps, records your best range of motion (ROM) per set, and charts recovery against
+healthy-range targets.
+
+> Not medical advice. Use alongside a physical therapist's plan.
+
+## Quick start
+
+```bash
+npm install
+npm run dev
+```
+
+Vite prints a `https://192.168.x.x:5173` URL. Open it **on your phone** (same Wi‑Fi). Accept the
+self-signed certificate warning (iOS: *Show Details → visit this website*). Motion sensors only
+work over HTTPS, which is why the dev server uses one.
+
+On desktop, open `https://localhost:5173/?sim=1` to drive the angle with a slider / arrow keys.
+
+## How it works
+
+1. `deviceorientation` events → quaternion (`src/quat.js`).
+2. On "Calibrate", the current pose becomes the neutral reference `q0`.
+3. Each sample: `q_rel = q0⁻¹ · q`, then the **twist angle about the exercise axis** (device X, Y or Z)
+   via swing–twist decomposition. This isolates e.g. wrist flexion from incidental wobble.
+4. A hysteresis rep detector (`src/reps.js`) counts excursions out of and back into the neutral band,
+   recording the peak of each.
+5. Sets are saved to `localStorage`; the Progress screen charts best ROM per set vs. the healthy target.
+
+Exercises (`src/exercises.js`): wrist flexion/extension, radial/ulnar deviation, forearm
+pronation/supination, elbow flexion, shoulder forward raise. Adding one is a 6-line object.
+
+## Apple Watch (phase 2, scaffolded)
+
+There is no web API for Watch sensors and a native watchOS app needs Xcode/macOS. Workaround:
+the free [Sensor Logger](https://www.tszheichoi.com/sensorlogger) app has a Watch companion and
+can HTTP-push samples to any server.
+
+```bash
+npm run relay        # listens on :8787
+```
+
+In Sensor Logger: gear icon → **HTTP Push** → `http://<your-pc-ip>:8787/data`, enable Watch
+*Wrist Motion*, start recording. In Regain choose **Sensor: Watch** and set the relay URL to
+`ws://<your-pc-ip>:8787`. The relay logs the sensor names/fields it sees on the first message —
+if the Watch field names differ from `quaternionW/X/Y/Z` or `gravityX/Y/Z`, adjust the field
+list in `relay/server.mjs`.
+
+## Roadmap
+
+- Finger/grip ROM via camera hand tracking (MediaPipe Hands).
+- Gamified reps (steer a ball with your wrist).
+- Therapist share link / PDF summary.
+- Native watchOS app (CoreMotion) if a Mac becomes available.
+
+## References
+
+- Validity of phone-based wrist ROM: [PMC11088398](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11088398/), [PMC8649412](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8649412/)
+- Sensor Logger data formats: [awesome-sensor-logger](https://github.com/tszheichoi/awesome-sensor-logger)
+- JS sensor fusion if raw IMU is needed: [psiphi75/ahrs](https://github.com/psiphi75/ahrs)
