@@ -300,3 +300,26 @@ textarea { width: 100%; font: 12px var(--mono); background: var(--surface); colo
 .ov-pick { display: flex; gap: 8px; margin: 6px 0 8px; }
 .ov-pick label { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ov-pick select { flex: 1; min-width: 0; padding: 8px 10px; font-size: 13px; }
+
+/* calendar heatmap: one hue, light to dark */
+.cal { display: block; width: 100%; max-width: 420px; margin: 0 auto; }
+.cal .axis { fill: var(--text-3); font-size: 9px; font-family: var(--mono); }
+.cal .day.n0 { fill: var(--surface-3); }
+.cal .day.n1 { fill: rgba(34, 211, 238, 0.35); }
+.cal .day.n2 { fill: rgba(34, 211, 238, 0.65); }
+.cal .day.n3 { fill: var(--accent); }
+.cal .day.today { stroke: var(--text); stroke-width: 1.5; }
+.legend .sw.cal { width: 12px; height: 12px; border-radius: 3px; margin: 0 2px; }
+.legend .sw.cal.n0 { background: var(--surface-3); }
+.legend .sw.cal.n1 { background: rgba(34, 211, 238, 0.35); }
+.legend .sw.cal.n2 { background: rgba(34, 211, 238, 0.65); }
+.legend .sw.cal.n3 { background: var(--accent); }
+.gains { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.gains .chip { text-transform: none; letter-spacing: 0.02em; font-family: var(--font); font-size: 12px; }
+
+/* pain scatter */
+.chart.scatter .band { fill: var(--good); opacity: 0.08; }
+.chart.scatter .pt { fill: var(--accent); opacity: 0.6; stroke: var(--bg); stroke-width: 1.5; }
+.chart.scatter .pt.recent { fill: var(--text); opacity: 1; }
+.legend .sw.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); opacity: 0.7; }
+.legend .sw.dot.recent { background: var(--text); opacity: 1; }

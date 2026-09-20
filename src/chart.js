@@ -9,7 +9,7 @@ export function timelineChart({ points, target, label, unit = '°', onSelect, ba
   const proj = project ? projection(points, target) : null;
   const t0 = points[0].ts, tEnd = Math.max(points.at(-1).ts, proj?.etaTs ?? 0);
   const span = Math.max(tEnd - t0, 864e5);
-  const maxV = Math.max(target * 1.15, ...points.map((p) => p.value * 1.1), 10);
+  const maxV = Math.max(target * 1.15, ...points.map((p) => p.value * 1.1), unit === '°' ? 10 : target * 1.3);
   const x = (ts) => padL + ((ts - t0) / span) * iw;
   const y = (v) => padT + ih - (v / maxV) * ih;
   const n = points.length;

@@ -67,5 +67,5 @@ All computed on device, per set, at save time (cached on the session object).
 2. DONE: Timeline card with rolling median, normal band, milestones and projection.
 3. DONE: Set report gets smoothness and time to peak; tapping a bar opens it.
 4. DONE: Replay and overlay.
-5. Calendar, pain correlation, weekly summary.
+5. DONE: Calendar, pain correlation, weekly summary.
 6. Therapist report, then sync.

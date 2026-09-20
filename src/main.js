@@ -7,6 +7,7 @@ import { timelineChart, projectionText } from './chart.js';
 import { computeMetrics } from './metrics.js';
 import { drawGauge } from './gauge.js';
 import { replayCard, overlayChart } from './replay.js';
+import { weeklySummary, calendarSvg, streakInfo, painInsight, painScatterSvg } from './insights.js';
 import { figure, mountFigure } from './figures.js';
 
 const app = document.getElementById('app');
@@ -119,6 +120,29 @@ function home() {
   segment(app.querySelector('#hold'), (v) => { settings.holdGoal = Number(v); saveSettings(settings); });
   app.querySelector('#relay')?.addEventListener('change', (e) => { settings.relayUrl = e.target.value; saveSettings(settings); });
   app.querySelectorAll('.card.tap').forEach((c) => (c.onclick = () => go('setup', byId(c.dataset.id))));
+}
+
+function overviewHtml(all) {
+  const w = weeklySummary(all, byId);
+  const st = streakInfo(all);
+  const trend = (cur, prev, unit = '', dp = 0) => (cur == null ? '–' : cur.toFixed(dp) + unit + (prev != null ? ` <small>${cur - prev >= 0 ? '+' : ''}${(cur - prev).toFixed(dp)}</small>` : ''));
+  return `
+    <div class="card">
+      <div class="row" style="margin:0 0 6px"><span class="eyebrow" style="margin:0">This week</span><span class="mono muted">vs previous 7 days</span></div>
+      <div class="hero" style="grid-template-columns:repeat(4,1fr)">
+        <div class="stat"><div class="v">${w.sets}<small>${w.setsPrev ? (w.sets - w.setsPrev >= 0 ? '+' : '') + (w.sets - w.setsPrev) : ''}</small></div><div class="l">sets</div></div>
+        <div class="stat"><div class="v">${w.days}<small>/7</small></div><div class="l">days</div></div>
+        <div class="stat"><div class="v">${trend(w.avgHold, null, 's', 1)}</div><div class="l">avg hold</div></div>
+        <div class="stat"><div class="v">${trend(w.smooth, w.smoothPrev)}</div><div class="l">smooth</div></div>
+      </div>
+      ${w.gains.length ? `<div class="gains">${w.gains.map((g) => `<span class="chip ${g.delta == null ? '' : g.delta >= 3 ? 'ok' : g.delta <= -3 ? 'warn' : ''}"><span class="dot"></span>${g.name} ${g.cur}° ${g.delta != null ? '(' + (g.delta >= 0 ? '+' : '') + g.delta + '°)' : ''}</span>`).join('')}</div>` : ''}
+      <p class="insight">${w.note}</p>
+    </div>
+    <div class="card">
+      <div class="row" style="margin:0 0 6px"><span class="eyebrow" style="margin:0">Consistency</span><span class="mono muted">${st.streak} day streak · ${st.activeDays28} of 28 days active</span></div>
+      ${calendarSvg(all)}
+      <div class="legend"><span>less</span><i class="sw cal n0"></i><i class="sw cal n1"></i><i class="sw cal n2"></i><i class="sw cal n3"></i><span>more</span></div>
+    </div>`;
 }
 
 function computeStreak(sessions) {
@@ -571,6 +595,8 @@ function progress(selectedId) {
   const mine = all.filter((s) => s.exerciseId === id).sort((a, b) => a.ts - b.ts);
   app.innerHTML = `
     ${header({ title: 'Progress', right: `<span class="chip">${all.length} sets</span>` })}
+    ${all.length ? overviewHtml(all) : ''}
+    <h2>By exercise</h2>
     <div class="chips" id="pick">${EXERCISES.map((e) => `<button aria-pressed="${e.id === id}" data-v="${e.id}">${e.joint} · ${e.name}</button>`).join('')}</div>
     <div id="charts"></div>
     <div id="table"></div>
@@ -627,6 +653,15 @@ function progress(selectedId) {
       wrap.querySelector('#ov-b').onchange = (e) => { bId = e.target.value; draw(); };
       charts.appendChild(wrap);
       draw();
+    }
+    const pi = painInsight(mine, ex);
+    if (pi.pts.length >= 3) {
+      const wrap = document.createElement('div'); wrap.className = 'card';
+      wrap.innerHTML = `<div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Pain vs ${ex.pos.toLowerCase()} range</span><span class="mono muted">${pi.pts.length} sets${pi.r != null ? ' · r ' + pi.r : ''}</span></div>
+        ${painScatterSvg(pi.pts, ex)}
+        <div class="legend"><span><i class="sw dot"></i> a set</span><span><i class="sw dot recent"></i> last 3 sets</span><span><i class="sw band"></i> normal range</span></div>
+        <p class="insight">${pi.note}</p>`;
+      charts.appendChild(wrap);
     }
     app.querySelector('#table').innerHTML = `<div class="card"><span class="eyebrow">Session log</span><table><thead><tr><th>Date</th><th>Reps</th><th>${ex.pos}</th>${ex.neg ? `<th>${ex.neg}</th>` : ''}<th>Hold</th><th>Pain</th></tr></thead><tbody>
       ${mine.slice().reverse().map((s) => `<tr><td>${new Date(s.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${s.reps.length}</td><td>${s.maxPos}°</td>${ex.neg ? `<td>${s.maxNeg}°</td>` : ''}<td>${s.avgHold != null ? s.avgHold.toFixed(1) + 's' : '–'}</td><td>${s.pain ?? '–'}</td></tr>`).join('')}
