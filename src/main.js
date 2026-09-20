@@ -198,7 +198,8 @@ async function startSession(ex) {
   session = { ex, source, q0: null, angle: 0, smooth: 0, det: new RepDetector(), sign, startedAt: Date.now(), latest: null, held: !MOUNT().pad, state: 'wait', paused: false, trace: [], raf: 0 };
   source.onSample = (q) => {
     session.latest = q;
-    if (!session.q0 || session.state !== 'track' || session.paused) return; // waiting for thumb / countdown / paused
+    if (session.state === 'cal') return checkStill(q);
+    if (!session.q0 || session.state !== 'track' || session.paused) return; // waiting for thumb / paused
     const raw = twistDeg(relative(session.q0, q), ex.axis) * session.sign;
     session.smooth += (raw - session.smooth) * 0.35;
     session.angle = Math.round(session.smooth);
@@ -228,22 +229,27 @@ function endSession() {
 }
 
 // Hold-still countdown, then the current pose becomes neutral. Also used by Recalibrate.
-function calibrate(seconds) {
+// The pose must stay within STILL_DEG for the whole countdown, otherwise it restarts (max 3 times):
+// a grip that is still settling would otherwise be baked into the neutral reference.
+const STILL_DEG = 4;
+function calibrate(seconds, restart = false) {
   if (!session) return;
   clearTimeout(session.calTimer);
   session.q0 = null; session.smooth = 0; session.det = new RepDetector(); session.trace = [];
   if (!session.held) { waitForThumb(); return; }
   session.state = 'cal';
+  session.calRef = null;
+  session.calRestarts = restart ? (session.calRestarts || 0) + 1 : 0;
   setState('cal');
+  liveEls.overlay.hidden = false;
+  liveEls.ovTitle.textContent = restart ? 'Phone moved. Hold still' : 'Hold the starting position';
+  liveEls.count.hidden = false;
   let n = seconds;
   const tick = () => {
     if (!session || !liveEls || session.state !== 'cal') return;
     if (n > 0) {
-      liveEls.overlay.hidden = false;
-      liveEls.ovTitle.textContent = 'Hold the starting position';
-      liveEls.count.hidden = false;
       liveEls.count.textContent = n;
-      speak(n === seconds ? `Hold still. ${n}` : String(n));
+      speak(n === seconds ? (restart ? `Phone moved. Hold still. ${n}` : `Hold still. ${n}`) : String(n));
       n -= 1;
       session.calTimer = setTimeout(tick, 1000);
     } else {
@@ -257,6 +263,13 @@ function calibrate(seconds) {
     }
   };
   tick();
+}
+
+function checkStill(q) {
+  if (!session.calRef) { session.calRef = q; return; }
+  const r = relative(session.calRef, q);
+  const total = (2 * Math.acos(Math.min(1, Math.abs(r.w))) * 180) / Math.PI; // total rotation since the countdown began
+  if (total > STILL_DEG && session.calRestarts < 3) calibrate(MOUNT().countdown, true);
 }
 
 function waitForThumb() {

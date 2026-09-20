@@ -180,22 +180,35 @@ const MOUNT_FIGS = {
     g += h.text(150, 224, 'Back of hand · screen up · fingers relaxed', 'middle', 'var(--text-3)', 11);
     return g;
   },
-  // Front view of the held phone: thumb along the side edge with its tip on the corner pad,
-  // finger pads flat on the back (visible only past the far edge), little finger under the bottom edge.
+  // Tray grip. Main view: screen toward us, the four straight fingers drawn x-ray style behind the
+  // phone pointing up from the bottom, thumb tip pinning the lower corner. Inset: edge view of the
+  // phone lying flat on the fingers.
   held: (h) => {
     let g = '';
     const skin = 'var(--text-3)';
-    g += `<rect x="${Math.min(h.X(150), h.X(262))}" y="60" width="112" height="176" rx="40" fill="${skin}" opacity="0.55"/>`; // palm behind
-    for (const y of [56, 88, 120, 152]) g += `<rect x="${Math.min(h.X(74), h.X(150))}" y="${y}" width="76" height="24" rx="12" fill="${skin}"/>`; // fingers behind, pads on the back
-    g += `<rect x="${Math.min(h.X(96), h.X(196))}" y="192" width="100" height="22" rx="11" fill="${skin}"/>`; // little finger under the bottom edge
-    // phone, screen toward us
-    g += `<rect x="${Math.min(h.X(110), h.X(190))}" y="26" width="80" height="164" rx="12" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`;
-    g += `<rect x="${Math.min(h.X(116), h.X(184))}" y="34" width="68" height="148" rx="7" fill="var(--good)" opacity="0.28"/>`;
-    // corner pad zone (lower thumb-side corner)
-    g += `<path d="M${h.X(184)},182 L${h.X(184)},128 A54,54 0 0 ${h.X(1) > h.X(0) ? 0 : 1} ${h.X(130)},182 Z" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
-    // thumb from the lower right, tip on the pad zone, resting along the edge (never on the middle of the screen)
-    g += h.line(226, 202, 204, 176, 26, skin) + h.line(204, 176, 178, 160, 22, skin);
-    g += h.text(150, 224, 'Thumb tip on the corner pad · finger pads flat on the back', 'middle', 'var(--text-3)', 11);
+    const px = 66, pw = 80, py = 22, ph = 160; // phone box
+    g += `<rect x="${Math.min(h.X(px + 6), h.X(px + pw - 6))}" y="${py + ph - 4}" width="${pw - 12}" height="26" rx="13" fill="${skin}"/>`; // palm / wrist below
+    g += `<rect x="${Math.min(h.X(px), h.X(px + pw))}" y="${py}" width="${pw}" height="${ph}" rx="12" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`;
+    g += `<rect x="${Math.min(h.X(px + 6), h.X(px + pw - 6))}" y="${py + 8}" width="${pw - 12}" height="${ph - 16}" rx="7" fill="var(--good)" opacity="0.22"/>`;
+    // fingers behind the phone (x-ray), from the bottom edge up
+    for (const [x, top] of [[px + 8, 66], [px + 27, 52], [px + 46, 58], [px + 65, 80]]) {
+      g += `<rect x="${Math.min(h.X(x), h.X(x + 15))}" y="${top}" width="15" height="${py + ph - 6 - top}" rx="7.5" fill="${skin}" opacity="0.4" stroke="${skin}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+    }
+    // corner pad zone + thumb pinning it
+    const cx = px + pw - 6, cy = py + ph - 8;
+    g += `<path d="M${h.X(cx)},${cy} L${h.X(cx)},${cy - 52} A52,52 0 0 ${h.X(1) > h.X(0) ? 0 : 1} ${h.X(cx - 52)},${cy} Z" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    g += h.line(px + pw + 34, py + ph - 2, px + pw - 4, py + ph - 14, 18, skin) + h.line(px + pw - 4, py + ph - 14, px + pw - 20, py + ph - 24, 15, skin);
+    g += h.text(px + pw / 2, 214, 'fingers straight behind the phone', 'middle', 'var(--text-2)', 10);
+    // inset: edge view, fingers horizontal, phone lying on them, thumb pressing the far corner from above
+    const ix = 196, iy = 120;
+    g += h.text(ix + 42, 70, 'Side view', 'middle', 'var(--text-3)', 10);
+    g += h.line(ix - 4, iy + 12, ix + 88, iy + 12, 16, skin);                                          // fingers, pointing to the top of the phone
+    g += `<rect x="${Math.min(h.X(ix), h.X(ix + 84))}" y="${iy - 1}" width="84" height="9" rx="3" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`; // phone lying flat
+    g += `<line x1="${Math.min(h.X(ix + 3), h.X(ix + 81))}" y1="${iy - 1}" x2="${Math.max(h.X(ix + 3), h.X(ix + 81))}" y2="${iy - 1}" stroke="var(--good)" stroke-width="3" stroke-linecap="round"/>`; // screen up
+    g += h.line(ix + 2, iy - 34, ix + 8, iy - 8, 14, skin);                                            // thumb from above onto the near (bottom) corner
+    g += h.text(ix + 42, iy + 40, 'flat on the fingers', 'middle', 'var(--text-2)', 10);
+    g += h.text(ix + 42, iy + 54, 'thumb pins corner', 'middle', 'var(--text-2)', 10);
+    g += h.text(150, 228, 'Tray grip · straight fingers · thumb tip on the corner pad', 'middle', 'var(--text-3)', 11);
     return g;
   },
 };
