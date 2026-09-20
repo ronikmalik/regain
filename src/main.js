@@ -218,7 +218,7 @@ function live() {
   app.innerHTML = `
     <div class="topbar"><button class="small ghost" id="cancel">✕</button><h1>${ex.name}</h1><button class="small" id="recal">Recalibrate</button></div>
     <div class="overlay" id="overlay" hidden><div class="eyebrow" id="ov-title">Hold the starting position</div><div class="count" id="count">3</div><p class="muted">${ex.arm}</p></div>
-    <button class="thumbpad" id="pad" data-side="${settings.hand}" aria-label="Thumb pad: keep your thumb here during the set">${THUMB}<span>Thumb here</span></button>
+    <button class="thumbpad" id="pad" aria-label="Thumb pad: keep your thumb here during the set">${THUMB}<span>Thumb here</span></button>
     <svg class="gauge" viewBox="0 0 300 170" id="gauge"></svg>
     <div class="angle"><div class="num" id="num">0°</div><div class="dir" id="dir">Hold neutral</div></div>
     <div class="stats">
