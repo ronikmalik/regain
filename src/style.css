@@ -119,3 +119,20 @@ textarea { width: 100%; font: 12px monospace; background: var(--surface); color:
 .legend .screen { background: var(--good); height: 3px; }
 .legend .pos { background: var(--accent); }
 .legend .neg { background: var(--warn); }
+
+/* thumb pad */
+.thumbpad {
+  position: fixed; bottom: calc(22px + env(safe-area-inset-bottom)); width: 132px; height: 132px; border-radius: 50%;
+  border: 3px dashed var(--text-3); background: var(--surface); color: var(--text-2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-size: 12px; font-weight: 600; z-index: 6; padding: 0;
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  animation: padpulse 1.6s ease-in-out infinite;
+}
+.thumbpad[data-side="right"] { right: 18px; }
+.thumbpad[data-side="left"] { left: 18px; }
+.thumbpad svg { width: 46px; height: 46px; }
+.thumbpad.held { border: 3px solid var(--good); background: rgba(27, 175, 122, 0.18); color: var(--good); animation: none; transform: scale(1.04); }
+.thumbpad:active { transform: scale(1.04); }
+@keyframes padpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(169, 182, 196, 0.25); } 50% { box-shadow: 0 0 0 14px rgba(169, 182, 196, 0); } }
+main.live { padding-bottom: 190px; }

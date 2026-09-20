@@ -7,6 +7,12 @@ import { romChart } from './chart.js';
 import { figure } from './figures.js';
 
 const app = document.getElementById('app');
+const THUMB = `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+  <path d="M14 40c-2-5-3-9-3-14a13 13 0 0 1 26 0c0 5-1 9-2 13"/>
+  <path d="M19 41c-1.5-5-2.5-10-2.5-15a7.5 7.5 0 0 1 15 0c0 5-1 10-2.5 15"/>
+  <path d="M24 42V26"/>
+  <path d="M8 22a16 16 0 0 1 32 0"/>
+</svg>`;
 const params = new URLSearchParams(location.search);
 const settings = loadSettings();
 if (params.has('sim')) settings.source = 'sim';
@@ -16,7 +22,7 @@ let session = null; // active session state
 
 // ---------- routing ----------
 const screens = { home, setup, live, summary, progress };
-function go(name, arg) { window.scrollTo(0, 0); screens[name](arg); }
+function go(name, arg) { window.scrollTo(0, 0); app.classList.remove('live'); screens[name](arg); }
 
 // ---------- home ----------
 function home() {
@@ -91,7 +97,7 @@ function setup(ex) {
       <div class="step"><span class="n">3</span><div><span class="eyebrow">Movement</span><p>${ex.cue}</p></div></div>
     </div>
     <p class="muted">Healthy range: ${ex.pos} ${ex.normal.pos}°${ex.neg ? `, ${ex.neg} ${ex.normal.neg}°` : ''}. Move slowly and stop if you feel sharp pain.</p>
-    <p class="muted">Tap Start with your other hand, then hold the starting position still for the 3-second countdown${settings.voice !== false ? ' — the voice coach will call out your reps so you don\'t need to watch the screen' : ''}.</p>
+    <p class="muted">Tap Start with your other hand, then rest your thumb on the pad that appears. The 3-second countdown begins once your thumb is on it, and the set only counts while it stays there${settings.voice !== false ? ' — the voice coach will call out your reps so you don\'t need to watch the screen' : ''}.</p>
     <div id="err"></div>
     <button class="primary block" id="start">Start</button>
   `;
@@ -103,7 +109,7 @@ function setup(ex) {
     try {
       await startSession(ex);
       go('live');
-      calibrate(3);
+      waitForThumb();
     } catch (e) {
       btn.disabled = false; btn.textContent = 'Start';
       app.querySelector('#err').innerHTML = `<div class="card error">${e.message}</div>`;
@@ -114,25 +120,54 @@ function setup(ex) {
 // Hold-still countdown, then the current pose becomes neutral. Also used by Recalibrate.
 function calibrate(seconds) {
   if (!session) return;
+  clearTimeout(session.calTimer);
   session.q0 = null; session.smooth = 0; session.det = new RepDetector();
+  if (!session.held) { waitForThumb(); return; }
+  session.state = 'cal';
   let n = seconds;
   const tick = () => {
-    if (!session || !liveEls) return;
+    if (!session || !liveEls || session.state !== 'cal') return;
     if (n > 0) {
       liveEls.overlay.hidden = false;
+      liveEls.ovTitle.textContent = 'Hold the starting position';
+      liveEls.count.hidden = false;
       liveEls.count.textContent = n;
       speak(n === seconds ? `Hold still. ${n}` : String(n));
       n -= 1;
       session.calTimer = setTimeout(tick, 1000);
     } else {
       session.q0 = session.latest;
+      session.state = 'track';
       liveEls.overlay.hidden = true;
       speak('Go');
       if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
     }
   };
-  clearTimeout(session.calTimer);
   tick();
+}
+
+// Overlay prompt shown until the thumb is on the pad.
+function waitForThumb() {
+  if (!session || !liveEls) return;
+  session.state = 'wait';
+  liveEls.overlay.hidden = false;
+  liveEls.ovTitle.textContent = 'Put your thumb on the pad to begin';
+  liveEls.count.hidden = true;
+  speak('Put your thumb on the pad');
+}
+
+// Thumb pad = grip check + dead-man switch. Tracking only runs while it is held.
+function setHeld(held) {
+  if (!session || !liveEls || session.held === held) return;
+  session.held = held;
+  liveEls.pad.classList.toggle('held', held);
+  if (held) {
+    if (session.state === 'wait') calibrate(3);
+    else if (session.state === 'track' && session.paused) { session.paused = false; renderLive(); speak('Go'); }
+  } else {
+    if (session.state === 'cal') { clearTimeout(session.calTimer); waitForThumb(); }
+    else if (session.state === 'track') { session.paused = true; session.det.dir = 0; session.det.peak = 0; renderLive(); speak('Paused. Thumb on the pad'); }
+  }
 }
 
 function speak(text) {
@@ -154,10 +189,10 @@ function makeSource(ex) {
 async function startSession(ex) {
   const source = makeSource(ex);
   let sign = ex.sign * (ex.handed && settings.hand === 'left' ? -1 : 1) * (settings.flips?.[ex.id] ? -1 : 1);
-  session = { ex, source, q0: null, angle: 0, smooth: 0, det: new RepDetector(), sign, startedAt: Date.now(), latest: null };
+  session = { ex, source, q0: null, angle: 0, smooth: 0, det: new RepDetector(), sign, startedAt: Date.now(), latest: null, held: false, state: 'wait', paused: false };
   source.onSample = (q) => {
     session.latest = q;
-    if (!session.q0) return; // still in the hold-still countdown
+    if (!session.q0 || session.state !== 'track' || session.paused) return; // waiting for thumb / countdown / paused
     const raw = twistDeg(relative(session.q0, q), ex.axis) * session.sign;
     session.smooth += (raw - session.smooth) * 0.35;
     session.angle = Math.round(session.smooth);
@@ -182,7 +217,8 @@ function live() {
   const { ex } = session;
   app.innerHTML = `
     <div class="topbar"><button class="small ghost" id="cancel">✕</button><h1>${ex.name}</h1><button class="small" id="recal">Recalibrate</button></div>
-    <div class="overlay" id="overlay" hidden><div class="eyebrow">Hold the starting position</div><div class="count" id="count">3</div><p class="muted">${ex.arm}</p></div>
+    <div class="overlay" id="overlay" hidden><div class="eyebrow" id="ov-title">Hold the starting position</div><div class="count" id="count">3</div><p class="muted">${ex.arm}</p></div>
+    <button class="thumbpad" id="pad" data-side="${settings.hand}" aria-label="Thumb pad: keep your thumb here during the set">${THUMB}<span>Thumb here</span></button>
     <svg class="gauge" viewBox="0 0 300 170" id="gauge"></svg>
     <div class="angle"><div class="num" id="num">0°</div><div class="dir" id="dir">Hold neutral</div></div>
     <div class="stats">
@@ -196,12 +232,22 @@ function live() {
       <span class="muted" id="source-note">${settings.source === 'phone' ? 'Phone sensors' : settings.source === 'watch' ? 'Apple Watch' : 'Simulator'}</span>
     </div>
     <button class="primary block" id="finish">Finish set</button>
+    <p class="muted" style="text-align:center">Keep your thumb on the pad. The set only counts while it is there.</p>
   `;
   liveEls = {
     gauge: app.querySelector('#gauge'), num: app.querySelector('#num'), dir: app.querySelector('#dir'),
     reps: app.querySelector('#reps'), repstat: app.querySelector('#repstat'), pos: app.querySelector('#best-pos'), neg: app.querySelector('#best-neg'),
-    overlay: app.querySelector('#overlay'), count: app.querySelector('#count'),
+    overlay: app.querySelector('#overlay'), count: app.querySelector('#count'), ovTitle: app.querySelector('#ov-title'), pad: app.querySelector('#pad'),
   };
+  app.classList.add('live');
+  const pad = liveEls.pad;
+  if (settings.source === 'sim') {
+    pad.onclick = () => setHeld(!session.held); // desktop: click toggles so the keyboard stays free
+  } else {
+    pad.onpointerdown = (e) => { e.preventDefault(); try { pad.setPointerCapture(e.pointerId); } catch {} setHeld(true); };
+    pad.onpointerup = pad.onpointercancel = () => setHeld(false);
+    pad.oncontextmenu = (e) => e.preventDefault();
+  }
   app.querySelector('#cancel').onclick = () => { endSession(); session = null; go('home'); };
   app.querySelector('#recal').onclick = () => calibrate(3);
   app.querySelector('#flip').onclick = () => {
@@ -227,7 +273,7 @@ function renderLive() {
   if (!liveEls || !session) return;
   const { ex, angle, det } = session;
   liveEls.num.textContent = `${Math.abs(angle)}°`;
-  liveEls.dir.textContent = Math.abs(angle) < 5 ? 'Neutral' : angle > 0 ? ex.pos : ex.neg || 'Past neutral';
+  liveEls.dir.textContent = session.paused ? 'Paused. Thumb lifted' : Math.abs(angle) < 5 ? 'Neutral' : angle > 0 ? ex.pos : ex.neg || 'Past neutral';
   liveEls.reps.textContent = det.reps.length;
   liveEls.pos.textContent = `${Math.round(det.maxPos)}°`;
   if (liveEls.neg) liveEls.neg.textContent = `${Math.round(det.maxNeg)}°`;

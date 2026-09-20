@@ -30,7 +30,7 @@ On desktop, open `https://localhost:5173/?sim=1` to drive the angle with a slide
    recording the peak of each.
 5. Sets are saved to `localStorage`; the Progress screen charts best ROM per set vs. the healthy target.
 
-Every exercise uses the same grip — the phone held in the palm the way you would read it — so nothing needs strapping on. Starting a set runs a 3-second hold-still countdown to capture the neutral pose, and a voice coach calls out reps and angles because the screen often faces away from you mid-movement.
+Every exercise uses the same grip — the phone held in the palm the way you would read it — so nothing needs strapping on. Starting a set runs a 3-second hold-still countdown to capture the neutral pose, and a voice coach calls out reps and angles because the screen often faces away from you mid-movement. A **thumb pad** in the corner nearest your thumb acts as a grip check and dead-man switch: the countdown starts when your thumb is on it and tracking pauses the moment it lifts, so reps only count while the phone is actually held as instructed.
 
 Exercises (`src/exercises.js`): wrist flexion/extension, radial/ulnar deviation, forearm
 pronation/supination, elbow flexion, shoulder forward raise. Adding one is a 6-line object.
