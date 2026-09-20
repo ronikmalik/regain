@@ -56,7 +56,7 @@ npm run relay        # listens on :8787
 
 In Sensor Logger: gear icon → **HTTP Push** → `http://<your-pc-ip>:8787/data`, enable Watch
 *Wrist Motion*, start recording. In Regain choose **Sensor: Watch** and set the relay URL to
-`ws://<your-pc-ip>:8787`. The relay logs the sensor names/fields it sees on the first message —
+`ws://<your-pc-ip>:8787`. The relay logs the sensor names/fields it sees on the first message :
 if the Watch field names differ from `quaternionW/X/Y/Z` or `gravityX/Y/Z`, adjust the field
 list in `relay/server.mjs`.
 

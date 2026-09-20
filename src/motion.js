@@ -13,7 +13,7 @@ export class PhoneSource {
   async start() {
     if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
       const res = await DeviceOrientationEvent.requestPermission();
-      if (res !== 'granted') throw new Error('Motion permission denied. Enable it in Settings > Safari > Motion & Orientation Access.');
+      if (res !== 'granted') throw new Error('Motion access denied. Enable it in Settings > Safari > Motion & Orientation Access.');
     }
     this._handler = (e) => {
       if (e.alpha == null && e.beta == null) return;
@@ -21,7 +21,7 @@ export class PhoneSource {
     };
     window.addEventListener('deviceorientation', this._handler, true);
     await new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('No motion data received. Open this page on a phone over HTTPS.')), 3000);
+      const t = setTimeout(() => reject(new Error('No motion data. Open this page on a phone over HTTPS.')), 3000);
       const once = () => { clearTimeout(t); window.removeEventListener('deviceorientation', once, true); resolve(); };
       window.addEventListener('deviceorientation', once, true);
     });
@@ -65,7 +65,7 @@ export class WatchSource {
     this._ws = new WebSocket(this.url);
     await new Promise((resolve, reject) => {
       this._ws.onopen = resolve;
-      this._ws.onerror = () => reject(new Error('Could not connect to relay at ' + this.url + '. Run "npm run relay".'));
+      this._ws.onerror = () => reject(new Error('Relay not reachable at ' + this.url + '. Run "npm run relay".'));
     });
     this._ws.onmessage = (ev) => {
       const s = JSON.parse(ev.data);

@@ -244,3 +244,8 @@ textarea { width: 100%; font: 12px var(--mono); background: var(--surface); colo
 .thumbpad.corner[data-side="left"] { left: -40px; padding-left: 40px; }
 .thumbpad.corner.held, .thumbpad.corner:active { transform: none; }
 .thumbpad.corner::before, .thumbpad.corner::after { inset: -8px; }
+
+/* numbered short steps */
+.steps { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); line-height: 1.5; }
+.steps li { padding: 2px 0; }
+.steps li::marker { color: var(--text-3); font-family: var(--mono); font-size: 12px; }

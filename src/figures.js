@@ -64,7 +64,7 @@ function sideBody(h) {
 }
 
 const FIGURES = {
-  // Wrist flexion / extension — viewed from ABOVE. Forearm points forward (up the page),
+  // Wrist flexion / extension: viewed from ABOVE. Forearm points forward (up the page),
   // phone edge-on with the screen facing the body midline; the hand swings toward / away from the body.
   'wrist-flex': (h) => {
     let s = '';
@@ -85,7 +85,7 @@ const FIGURES = {
     return s;
   },
 
-  // Radial / ulnar deviation — SIDE view. Phone lies along the forearm (we see its back);
+  // Radial / ulnar deviation: SIDE view. Phone lies along the forearm (we see its back);
   // the hand tips the top of the phone up toward the thumb or down toward the little finger.
   'wrist-dev': (h) => {
     let s = sideBody(h);
@@ -101,7 +101,7 @@ const FIGURES = {
     return s;
   },
 
-  // Pronation / supination — FRONT view. Forearm points at the viewer, so we see the fist with the
+  // Pronation / supination: FRONT view. Forearm points at the viewer, so we see the fist with the
   // phone edge-on (thumb up, screen toward the body). Roll clockwise = pronation for the right hand.
   'forearm-rot': (h) => {
     let s = '';
@@ -120,7 +120,7 @@ const FIGURES = {
     return s;
   },
 
-  // Elbow flexion — SIDE view. Arm hangs straight, palm & screen forward, phone top toward the floor.
+  // Elbow flexion: SIDE view. Arm hangs straight, palm & screen forward, phone top toward the floor.
   'elbow-flex': (h) => {
     let s = sideBody(h);
     s += h.ghost(70, 128, 104, 86);        // forearm at full flexion (ghost)
@@ -134,7 +134,7 @@ const FIGURES = {
     return s;
   },
 
-  // Shoulder forward raise — SIDE view. Whole straight arm swings forward and up.
+  // Shoulder forward raise: SIDE view. Whole straight arm swings forward and up.
   'shoulder-flex': (h) => {
     let s = sideBody(h);
     s += h.ghost(70, 72, 178, 72);         // arm raised to horizontal (ghost)
@@ -208,7 +208,7 @@ const MOUNT_FIGS = {
     g += h.line(ix + 2, iy - 34, ix + 8, iy - 8, 14, skin);                                            // thumb from above onto the near (bottom) corner
     g += h.text(ix + 42, iy + 40, 'flat on the fingers', 'middle', 'var(--text-2)', 10);
     g += h.text(ix + 42, iy + 54, 'thumb pins corner', 'middle', 'var(--text-2)', 10);
-    g += h.text(150, 228, 'Tray grip · straight fingers · thumb tip on the corner pad', 'middle', 'var(--text-3)', 11);
+    g += h.text(150, 228, 'Straight fingers · thumb on the corner pad', 'middle', 'var(--text-3)', 11);
     return g;
   },
 };

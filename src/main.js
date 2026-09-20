@@ -53,6 +53,7 @@ function recoveryPct(ex, s) {
   if (ex.neg) parts.push(pctOf(s.maxNeg, ex.normal.neg));
   return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
 }
+const lines = (arr) => `<ol class="steps">${arr.map((t) => `<li>${t}</li>`).join('')}</ol>`;
 const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 // ---------- routing ----------
@@ -99,7 +100,7 @@ function home() {
       }).join('')}
     `).join('')}
     <div class="row" style="margin-top:18px"><button class="outline" id="progress" style="width:100%">Progress &amp; history${sessions.length ? ` · ${sessions.length} sets` : ''}</button></div>
-    <p class="muted" style="text-align:center;margin-top:16px">Hold your phone like you normally would. Not medical advice — follow your therapist's plan.</p>
+    <p class="muted" style="text-align:center;margin-top:16px">Not medical advice. Follow your therapist's plan.</p>
   `;
   app.querySelector('#progress').onclick = () => go('progress');
   segment(app.querySelector('#hand'), (v) => { settings.hand = v; saveSettings(settings); });
@@ -144,7 +145,7 @@ function setup(ex) {
     <div class="card figwrap">
       <div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Phone mount · ${MOUNT().name}</span><span class="chip ${settings.mount === 'strap' ? 'ok' : 'warn'}"><span class="dot"></span>${MOUNT().tag}</span></div>
       ${mountFigure(settings.mount, settings.hand)}
-      <p class="muted" style="margin:6px 0 8px">${MOUNT().summary}</p>
+      <p class="muted" style="margin:6px 0 8px;text-align:center">${MOUNT().summary}</p>
       <div class="seg" id="mount" style="display:flex"><button aria-pressed="${settings.mount === 'strap'}" data-v="strap" style="flex:1">Strapped</button><button aria-pressed="${settings.mount === 'held'}" data-v="held" style="flex:1">Hand-held</button></div>
     </div>
     <div class="card figwrap">
@@ -153,18 +154,22 @@ function setup(ex) {
       <div class="legend"><span><i class="sw screen"></i> screen side</span><span><i class="sw pos"></i> ${ex.pos}</span>${ex.neg ? `<span><i class="sw neg"></i> ${ex.neg}</span>` : ''}</div>
     </div>
     <div class="card grip">
-      <div class="step"><span class="n">01</span><div><span class="eyebrow">Mount the phone</span><p>${MOUNT().how}</p></div></div>
-      <div class="step"><span class="n">02</span><div><span class="eyebrow">Position</span><p>${ex.arm}</p></div></div>
-      <div class="step"><span class="n">03</span><div><span class="eyebrow">Movement</span><p>${ex.cue}</p></div></div>
+      <div class="step"><span class="n">01</span><div><span class="eyebrow">Mount</span>${lines(MOUNT().how)}</div></div>
+      <div class="step"><span class="n">02</span><div><span class="eyebrow">Start position</span><p>${ex.arm}</p></div></div>
+      <div class="step"><span class="n">03</span><div><span class="eyebrow">Movement</span>${lines(ex.cue)}</div></div>
     </div>
     <div class="targets">
       <div class="target"><div class="k">${ex.pos} · normal</div><div class="v">${ex.normal.pos}°</div></div>
       ${ex.neg ? `<div class="target"><div class="k">${ex.neg} · normal</div><div class="v">${ex.normal.neg}°</div></div>` : ''}
       <div class="target"><div class="k">Rep goal</div><div class="v">${REP_GOAL()}<small>reps</small></div></div>
     </div>
-    <p class="muted">${MOUNT().pad
-      ? 'Tap Start with your other hand, then rest your thumb on the corner pad. The countdown begins once your thumb is on it and the set only counts while it stays there'
-      : 'Tap Start with your other hand and get into the starting position during the ' + MOUNT().countdown + '-second countdown. Nothing touches the screen during the set'}${settings.voice !== false ? '. The voice coach calls out every rep' : ''}. Move slowly; stop on sharp pain.</p>
+    <div class="card"><span class="eyebrow">Before you start</span>${lines([
+      'Tap Start with your other hand.',
+      MOUNT().pad ? 'Rest your thumb on the corner pad to begin the countdown.' : 'Get into the start position during the ' + MOUNT().countdown + ' second countdown.',
+      'Hold still until you hear "Go".',
+      MOUNT().pad ? 'Reps only count while your thumb is on the pad.' : 'Nothing touches the screen during the set.',
+      'Move slowly. Stop on sharp pain.',
+    ])}</div>
     <div id="err"></div>
     <button class="primary block" id="start">Start session</button>
   `;
@@ -172,7 +177,7 @@ function setup(ex) {
   segment(app.querySelector('#mount'), (v) => { settings.mount = v; saveSettings(settings); setup(ex); });
   app.querySelector('#start').onclick = async () => {
     const btn = app.querySelector('#start');
-    btn.disabled = true; btn.textContent = 'Connecting sensors…';
+    btn.disabled = true; btn.textContent = 'Connecting sensors';
     try { if (settings.voice !== false) speechSynthesis?.speak(new SpeechSynthesisUtterance('')); } catch {} // iOS: unlock speech inside the tap
     try {
       await startSession(ex);
@@ -242,7 +247,7 @@ function calibrate(seconds, restart = false) {
   session.calRestarts = restart ? (session.calRestarts || 0) + 1 : 0;
   setState('cal');
   liveEls.overlay.hidden = false;
-  liveEls.ovTitle.textContent = restart ? 'Phone moved. Hold still' : 'Hold the starting position';
+  liveEls.ovTitle.textContent = restart ? 'Phone moved. Hold still' : 'Hold still';
   liveEls.count.hidden = false;
   let n = seconds;
   const tick = () => {
@@ -277,9 +282,9 @@ function waitForThumb() {
   session.state = 'wait';
   setState('wait');
   liveEls.overlay.hidden = false;
-  liveEls.ovTitle.textContent = 'Put your thumb on the pad to begin';
+  liveEls.ovTitle.textContent = 'Thumb on the pad to begin';
   liveEls.count.hidden = true;
-  speak('Put your thumb on the pad');
+  speak('Thumb on the pad');
 }
 
 // Thumb pad = grip check + dead-man switch. Tracking only runs while it is held.
@@ -292,7 +297,7 @@ function setHeld(held) {
     else if (session.state === 'track' && session.paused) { session.paused = false; setState('track'); renderLive(); speak('Go'); }
   } else {
     if (session.state === 'cal') { clearTimeout(session.calTimer); waitForThumb(); }
-    else if (session.state === 'track') { session.paused = true; session.det.dir = 0; session.det.peak = 0; setState('paused'); renderLive(); speak('Paused. Thumb on the pad'); }
+    else if (session.state === 'track') { session.paused = true; session.det.dir = 0; session.det.peak = 0; setState('paused'); renderLive(); speak('Paused'); }
   }
 }
 
@@ -333,13 +338,13 @@ function live() {
       <div class="tile"><div class="v" id="best-pos">0°</div><div class="l">${ex.pos}</div><div class="t">target ${ex.normal.pos}°</div></div>
       ${ex.neg ? `<div class="tile"><div class="v" id="best-neg">0°</div><div class="l">${ex.neg}</div><div class="t">target ${ex.normal.neg}°</div></div>` : '<div></div>'}
     </div>
-    <p class="cue">${ex.cue}</p>
+    <p class="cue">${ex.cue.slice(0, -1).join(' ')}</p>
     <div class="row" style="margin-top:10px">
-      <button class="small ghost" id="flip">Directions look swapped?</button>
+      <button class="small ghost" id="flip">Swap directions</button>
       <button class="small outline" id="recal">Recalibrate</button>
     </div>
     <button class="primary block" id="finish">Finish set</button>
-    <p class="muted" style="text-align:center">${MOUNT().pad ? 'Keep your thumb on the corner pad. The set only counts while it is there.' : 'Strapped mode: nothing needs to touch the screen. Use Recalibrate if the phone shifts.'}</p>
+    <p class="muted" style="text-align:center">${MOUNT().pad ? 'Reps count only while your thumb is on the pad.' : 'Phone shifted? Tap Recalibrate.'}</p>
   `;
   liveEls = {
     gauge: app.querySelector('#gauge'), num: app.querySelector('#num'), dir: app.querySelector('#dir'), trace: app.querySelector('#trace'),
@@ -387,7 +392,7 @@ function renderLive() {
   if (!liveEls || !session) return;
   const { ex, angle, det } = session;
   liveEls.num.innerHTML = `${Math.abs(angle)}<sup>°</sup>`;
-  liveEls.dir.textContent = session.paused ? 'Paused · thumb lifted' : Math.abs(angle) < 5 ? 'Neutral' : angle > 0 ? ex.pos : ex.neg || 'Past neutral';
+  liveEls.dir.textContent = session.paused ? 'Paused' : Math.abs(angle) < 5 ? 'Neutral' : angle > 0 ? ex.pos : ex.neg || 'Past neutral';
   liveEls.dir.classList.toggle('paused', session.paused);
   liveEls.reps.textContent = det.reps.length;
   const rr = liveEls.repstat.querySelector('.ring');
@@ -480,7 +485,7 @@ function summary() {
     </div>
     <div class="card">
       <span class="eyebrow">Peak per rep</span>
-      ${reps.length ? repsChart(ex, reps) : '<p class="muted">No reps were detected. Make sure your thumb stayed on the pad and the movement passed 12°.</p>'}
+      ${reps.length ? repsChart(ex, reps) : '<p class="muted">No reps detected. A rep must pass 12° and return to neutral.</p>'}
     </div>
     <div class="card report">
       <span class="eyebrow">Details</span>
@@ -495,7 +500,7 @@ function summary() {
       <div class="row" style="margin:0"><span class="eyebrow" style="margin:0">Pain during set</span><b class="mono" id="painv">0 / 10</b></div>
       <div class="pain" id="pain">${Array.from({ length: 11 }, (_, i) => `<button aria-pressed="${i === 0}" data-v="${i}" class="${i >= 7 ? 'hi' : i >= 4 ? 'mid' : ''}">${i}</button>`).join('')}</div>
       <div class="pain-scale"><span>none</span><span>moderate</span><span>severe</span></div>
-      <p class="muted">Tell your therapist about anything above 4, or any sharp pain.</p>
+      <p class="muted">Report pain above 4, or any sharp pain, to your therapist.</p>
     </div>
     <button class="primary block" id="save">Save to history</button>
     <button class="block ghost" id="discard">Discard</button>
@@ -519,7 +524,7 @@ function repsChart(ex, reps) {
   }).join('');
   const t = (v) => `<line x1="4" x2="${W - 4}" y1="${H - 14 - (v / max) * (H - 18)}" y2="${H - 14 - (v / max) * (H - 18)}" stroke-dasharray="3 3"/>`;
   return `<svg class="reps-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${t(ex.normal.pos)}${ex.neg ? t(ex.normal.neg) : ''}${bars}</svg>
-    <div class="legend"><span><i class="sw pos"></i> ${ex.pos}</span>${ex.neg ? `<span><i class="sw neg"></i> ${ex.neg}</span>` : ''}<span class="muted">dashed = normal range</span></div>`;
+    <div class="legend"><span><i class="sw pos"></i> ${ex.pos}</span>${ex.neg ? `<span><i class="sw neg"></i> ${ex.neg}</span>` : ''}<span class="muted">dashed: normal range</span></div>`;
 }
 
 // ---------- progress ----------
@@ -543,7 +548,7 @@ function progress(selectedId) {
   segment(app.querySelector('#pick'), (v) => progress(v));
   const charts = app.querySelector('#charts');
   if (!mine.length) {
-    charts.innerHTML = `<div class="card"><p>No sets recorded for this exercise yet.</p></div>`;
+    charts.innerHTML = `<div class="card"><p>No sets yet.</p></div>`;
   } else {
     const block = (label, key, target) => {
       const wrap = document.createElement('div'); wrap.className = 'card';
