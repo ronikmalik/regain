@@ -28,6 +28,16 @@ export const MOUNTS = {
     name: 'Hand-held',
     tag: 'No equipment',
     short: 'Hand-held',
+    countdown: 3,
+    pad: true,
+  },
+};
+
+// Hand-held grips. Wrist exercises use the locked grip (index and little finger hook the side edges),
+// everything else uses the tray grip. The thumb lies flat on the screen in both, so the pad works.
+export const GRIPS = {
+  tray: {
+    id: 'tray',
     summary: 'Phone lies flat on four straight fingers. The thumb rests flat across the lower middle of the screen.',
     how: [
       'Hold four fingers straight and together, palm up.',
@@ -35,23 +45,32 @@ export const MOUNTS = {
       'Rest your thumb flat across the lower middle of the screen, over the pad.',
       'Keep fingers and thumb still. Do not squeeze or press.',
     ],
-    countdown: 3,
-    pad: true,
+  },
+  locked: {
+    id: 'locked',
+    summary: 'Index and little finger hook the two side edges. Middle and ring fingers support the back. The thumb rests flat on the screen.',
+    how: [
+      'Lay the phone face-up on your middle and ring fingers.',
+      'Hook your index finger over one side edge and your little finger over the other.',
+      'Rest your thumb flat up the lower middle of the screen, over the pad.',
+      'Hold lightly and keep every finger still. Do not squeeze.',
+    ],
   },
 };
+export const gripFor = (ex, mount) => (mount === 'held' ? GRIPS[ex.grip || 'tray'] : null);
 
 // Multiply an exercise's sign by this for the chosen mount.
 export const mountSign = (ex, mount) => (mount === 'strap' && ex.axis[1] === 0 ? -1 : 1);
 
 export const EXERCISES = [
   {
-    id: 'wrist-flex', joint: 'Wrist', name: 'Flexion / Extension',
+    id: 'wrist-flex', joint: 'Wrist', name: 'Flexion / Extension', grip: 'locked',
     axis: [1, 0, 0], sign: 1, pos: 'Flexion', neg: 'Extension', normal: { pos: 80, neg: 70 },
     arm: 'Elbow bent 90° at your side. Forearm level, thumb up, wrist straight.',
     cue: ['Bend the hand toward the palm side (flexion).', 'Return to straight.', 'Bend toward the back of the hand (extension).', 'Each direction counts as one rep.'],
   },
   {
-    id: 'wrist-dev', joint: 'Wrist', name: 'Radial / Ulnar deviation',
+    id: 'wrist-dev', joint: 'Wrist', name: 'Radial / Ulnar deviation', grip: 'locked',
     axis: [0, 0, 1], sign: -1, handed: true, pos: 'Radial', neg: 'Ulnar', normal: { pos: 20, neg: 35 },
     arm: 'Elbow bent 90° at your side. Forearm level, thumb up, wrist straight.',
     cue: ['Tip the hand up toward the thumb (radial).', 'Return to centre.', 'Tip down toward the little finger (ulnar).', 'Keep the palm facing the same way.'],

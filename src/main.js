@@ -1,4 +1,4 @@
-import { EXERCISES, MOUNTS, mountSign, byId } from './exercises.js';
+import { EXERCISES, MOUNTS, mountSign, gripFor, byId } from './exercises.js';
 import { PhoneSource, SimSource, WatchSource } from './motion.js';
 import { relative, twistDeg } from './quat.js';
 import { RepDetector } from './reps.js';
@@ -140,12 +140,13 @@ function relDate(ts) {
 
 // ---------- setup ----------
 function setup(ex) {
+  const grip = gripFor(ex, settings.mount);
   app.innerHTML = `
     ${header({ title: `${ex.joint} · ${ex.name}`, right: `<span class="chip">${settings.hand} hand</span>` })}
     <div class="card figwrap">
       <div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Phone mount · ${MOUNT().name}</span><span class="chip ${settings.mount === 'strap' ? 'ok' : 'warn'}"><span class="dot"></span>${MOUNT().tag}</span></div>
-      ${mountFigure(settings.mount, settings.hand)}
-      <p class="muted" style="margin:6px 0 8px;text-align:center">${MOUNT().summary}</p>
+      ${mountFigure(settings.mount, settings.hand, grip?.id)}
+      <p class="muted" style="margin:6px 0 8px;text-align:center">${grip ? grip.summary : MOUNT().summary}</p>
       <div class="seg" id="mount" style="display:flex"><button aria-pressed="${settings.mount === 'strap'}" data-v="strap" style="flex:1">Strapped</button><button aria-pressed="${settings.mount === 'held'}" data-v="held" style="flex:1">Hand-held</button></div>
     </div>
     <div class="card figwrap">
@@ -154,7 +155,7 @@ function setup(ex) {
       <div class="legend"><span><i class="sw screen"></i> screen side</span><span><i class="sw pos"></i> ${ex.pos}</span>${ex.neg ? `<span><i class="sw neg"></i> ${ex.neg}</span>` : ''}</div>
     </div>
     <div class="card grip">
-      <div class="step"><span class="n">01</span><div><span class="eyebrow">Mount</span>${lines(MOUNT().how)}</div></div>
+      <div class="step"><span class="n">01</span><div><span class="eyebrow">Mount</span>${lines(grip ? grip.how : MOUNT().how)}</div></div>
       <div class="step"><span class="n">02</span><div><span class="eyebrow">Start position</span><p>${ex.arm}</p></div></div>
       <div class="step"><span class="n">03</span><div><span class="eyebrow">Movement</span>${lines(ex.cue)}</div></div>
     </div>

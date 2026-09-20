@@ -183,15 +183,17 @@ const MOUNT_FIGS = {
   // Tray grip. Main view: screen toward us, the four straight fingers drawn x-ray style behind the
   // phone pointing up from the bottom, thumb lying flat across the lower middle of the screen. Inset: edge view of the
   // phone lying flat on the fingers.
-  held: (h) => {
+  held: (h, grip = 'tray') => {
     let g = '';
+    const locked = grip === 'locked';
     const skin = 'var(--text-3)';
     const px = 66, pw = 80, py = 22, ph = 160; // phone box
     g += `<rect x="${Math.min(h.X(px + 6), h.X(px + pw - 6))}" y="${py + ph - 4}" width="${pw - 12}" height="26" rx="13" fill="${skin}"/>`; // palm / wrist below
     g += `<rect x="${Math.min(h.X(px), h.X(px + pw))}" y="${py}" width="${pw}" height="${ph}" rx="12" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`;
     g += `<rect x="${Math.min(h.X(px + 6), h.X(px + pw - 6))}" y="${py + 8}" width="${pw - 12}" height="${ph - 16}" rx="7" fill="var(--good)" opacity="0.22"/>`;
     // fingers behind the phone (x-ray), from the bottom edge up
-    for (const [x, top] of [[px + 8, 66], [px + 27, 52], [px + 46, 58], [px + 65, 80]]) {
+    const behind = locked ? [[px + 27, 52], [px + 46, 58]] : [[px + 8, 66], [px + 27, 52], [px + 46, 58], [px + 65, 80]];
+    for (const [x, top] of behind) {
       g += `<rect x="${Math.min(h.X(x), h.X(x + 15))}" y="${top}" width="15" height="${py + ph - 6 - top}" rx="7.5" fill="${skin}" opacity="0.4" stroke="${skin}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
     }
     // pad zone in the lower middle of the screen + thumb lying flat across it
@@ -199,7 +201,15 @@ const MOUNT_FIGS = {
     g += `<circle cx="${h.X(cx)}" cy="${cy}" r="30" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
     // thumb comes straight up from below the bottom edge, beside the index finger, and lies over the screen up to the pad
     g += h.line(px + pw - 16, py + ph + 10, px + pw - 14, py + ph - 10, 19, skin) + h.line(px + pw - 14, py + ph - 10, px + pw / 2 + 8, py + ph - 42, 16, skin);
-    g += h.text(px + pw / 2, 214, 'fingers straight behind the phone', 'middle', 'var(--text-2)', 10);
+    if (locked) {
+      // index finger hooks the thumb-side edge, little finger hooks the far edge (x-ray shaft behind, solid tip over the edge)
+      for (const [x, top, tipY] of [[px + 65, 84, 74], [px + 8, 104, 96]]) {
+        g += `<rect x="${Math.min(h.X(x), h.X(x + 15))}" y="${top}" width="15" height="${py + ph - 6 - top}" rx="7.5" fill="${skin}" opacity="0.4" stroke="${skin}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+        const over = x > px + pw / 2 ? [px + pw - 12, px + pw + 6] : [px - 6, px + 12];
+        g += `<rect x="${Math.min(h.X(over[0]), h.X(over[1]))}" y="${tipY}" width="18" height="22" rx="9" fill="${skin}"/>`;
+      }
+    }
+    g += h.text(px + pw / 2, 214, locked ? 'index and little finger hook the edges' : 'fingers straight behind the phone', 'middle', 'var(--text-2)', 10);
     // inset: edge view, fingers horizontal, phone lying on them, thumb wrapped round the bottom edge, lying flat on the screen
     const ix = 196, iy = 120;
     g += h.text(ix + 42, 70, 'Side view', 'middle', 'var(--text-3)', 10);
@@ -209,14 +219,14 @@ const MOUNT_FIGS = {
     g += h.line(ix - 16, iy + 10, ix - 4, iy - 8, 12, skin) + h.line(ix - 4, iy - 8, ix + 34, iy - 8, 12, skin); // thumb wraps round the bottom edge and lies flat along the screen
     g += h.text(ix + 42, iy + 40, 'flat on the fingers', 'middle', 'var(--text-2)', 10);
     g += h.text(ix + 42, iy + 54, 'thumb flat on the screen', 'middle', 'var(--text-2)', 10);
-    g += h.text(150, 228, 'Straight fingers · thumb flat across the pad', 'middle', 'var(--text-3)', 11);
+    g += h.text(150, 228, locked ? 'Edges locked · thumb flat on the pad' : 'Straight fingers · thumb flat across the pad', 'middle', 'var(--text-3)', 11);
     return g;
   },
 };
 
-export function mountFigure(mount, hand) {
+export function mountFigure(mount, hand, grip) {
   const draw = MOUNT_FIGS[mount];
   if (!draw) return '';
   const h = helpers(hand === 'left');
-  return `<svg class="figure" viewBox="0 0 ${W} ${H}" role="img" aria-label="How to mount the phone: ${mount}">${defs}${draw(h)}</svg>`;
+  return `<svg class="figure" viewBox="0 0 ${W} ${H}" role="img" aria-label="How to mount the phone: ${mount}">${defs}${draw(h, grip)}</svg>`;
 }
