@@ -31,7 +31,8 @@ A clinical-instrument UI: dark ground, cyan monitor accent, Inter + JetBrains Mo
 3. Each sample: `q_rel = q0⁻¹ · q`, then the **twist angle about the exercise axis** (device X, Y or Z)
    via swing–twist decomposition. This isolates e.g. wrist flexion from incidental wobble.
 4. A hysteresis rep detector (`src/reps.js`) counts excursions out of and back into the neutral band,
-   recording the peak of each.
+   recording the peak of each and the longest still period near the peak (the hold, measured with a
+   300 ms speed window so sensor jitter does not break it). Each set also stores a 20 Hz angle trace.
 5. Sets are saved to `localStorage`; the Progress screen charts best ROM per set vs. the healthy target.
 
 The measurement is only as good as the coupling between phone and hand, so the app offers two **mounts** (`src/exercises.js` MOUNTS):
@@ -43,6 +44,10 @@ Switching mount mirrors the device frame (screen faces away from the palm instea
 
 Exercises (`src/exercises.js`): wrist flexion/extension, radial/ulnar deviation, forearm
 pronation/supination, elbow flexion, shoulder forward raise. Adding one is a 6-line object.
+
+## Progress roadmap
+
+See [docs/PROGRESS_PLAN.md](docs/PROGRESS_PLAN.md) for how the per-set traces become smoothness, symmetry, hold and timeline views.
 
 ## Apple Watch (phase 2, scaffolded)
 

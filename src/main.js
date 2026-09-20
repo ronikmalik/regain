@@ -13,6 +13,9 @@ if (params.has('sim')) settings.source = 'sim';
 settings.source ||= 'phone';
 settings.goal ||= 10; // reps per set
 settings.mount ||= 'strap';
+settings.holdGoal ||= 3; // seconds to hold each end position
+const HOLD_GOAL = () => settings.holdGoal;
+const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const MOUNT = () => MOUNTS[settings.mount] || MOUNTS.strap;
 
 let session = null; // active session state
@@ -89,6 +92,7 @@ function home() {
       <div class="row"><span>Injured side</span><div class="seg" id="hand"><button aria-pressed="${settings.hand === 'left'}" data-v="left">Left</button><button aria-pressed="${settings.hand === 'right'}" data-v="right">Right</button></div></div>
       <div class="row"><span>Sensor</span><div class="seg" id="source"><button aria-pressed="${settings.source === 'phone'}" data-v="phone">Phone</button><button aria-pressed="${settings.source === 'watch'}" data-v="watch">Watch</button><button aria-pressed="${settings.source === 'sim'}" data-v="sim">Sim</button></div></div>
       <div class="row"><span>Voice coach</span><div class="seg" id="voice"><button aria-pressed="${settings.voice !== false}" data-v="on">On</button><button aria-pressed="${settings.voice === false}" data-v="off">Off</button></div></div>
+      <div class="row"><span>Hold each position</span><div class="seg" id="hold">${[2, 3, 5].map((g) => `<button aria-pressed="${settings.holdGoal === g}" data-v="${g}">${g}s</button>`).join('')}</div></div>
       <div class="row"><span>Rep goal per set</span><div class="seg" id="goal">${[5, 10, 15].map((g) => `<button aria-pressed="${settings.goal === g}" data-v="${g}">${g}</button>`).join('')}</div></div>
       ${settings.source === 'watch' ? `<div class="row" style="display:block"><span class="eyebrow">Relay URL</span><input id="relay" type="url" value="${settings.relayUrl || 'ws://localhost:8787'}" style="margin-top:6px"><p class="muted">Apple Watch data arrives via the Sensor Logger app → <code>npm run relay</code>. See README.</p></div>` : ''}
     </div>
@@ -108,6 +112,7 @@ function home() {
   segment(app.querySelector('#source'), (v) => { settings.source = v; saveSettings(settings); home(); });
   segment(app.querySelector('#voice'), (v) => { settings.voice = v === 'on'; saveSettings(settings); });
   segment(app.querySelector('#goal'), (v) => { settings.goal = Number(v); saveSettings(settings); });
+  segment(app.querySelector('#hold'), (v) => { settings.holdGoal = Number(v); saveSettings(settings); });
   app.querySelector('#relay')?.addEventListener('change', (e) => { settings.relayUrl = e.target.value; saveSettings(settings); });
   app.querySelectorAll('.card.tap').forEach((c) => (c.onclick = () => go('setup', byId(c.dataset.id))));
 }
@@ -157,12 +162,13 @@ function setup(ex) {
     <div class="card grip">
       <div class="step"><span class="n">01</span><div><span class="eyebrow">Mount</span>${lines(grip ? grip.how : MOUNT().how)}</div></div>
       <div class="step"><span class="n">02</span><div><span class="eyebrow">Start position</span><p>${ex.arm}</p></div></div>
-      <div class="step"><span class="n">03</span><div><span class="eyebrow">Movement</span>${lines(ex.cue)}</div></div>
+      <div class="step"><span class="n">03</span><div><span class="eyebrow">Movement</span>${lines([...ex.cue, `Hold each end position for ${HOLD_GOAL()} seconds.`])}</div></div>
     </div>
     <div class="targets">
       <div class="target"><div class="k">${ex.pos} · normal</div><div class="v">${ex.normal.pos}°</div></div>
       ${ex.neg ? `<div class="target"><div class="k">${ex.neg} · normal</div><div class="v">${ex.normal.neg}°</div></div>` : ''}
       <div class="target"><div class="k">Rep goal</div><div class="v">${REP_GOAL()}<small>reps</small></div></div>
+      <div class="target"><div class="k">Hold</div><div class="v">${HOLD_GOAL()}<small>s each</small></div></div>
     </div>
     <div class="card"><span class="eyebrow">Before you start</span>${lines([
       'Tap Start with your other hand.',
@@ -201,7 +207,7 @@ function makeSource(ex) {
 async function startSession(ex) {
   const source = makeSource(ex);
   const sign = ex.sign * mountSign(ex, settings.mount) * (ex.handed && settings.hand === 'left' ? -1 : 1) * (settings.flips?.[ex.id] ? -1 : 1);
-  session = { ex, source, q0: null, angle: 0, smooth: 0, det: new RepDetector(), sign, startedAt: Date.now(), latest: null, held: !MOUNT().pad, state: 'wait', paused: false, trace: [], raf: 0 };
+  session = { ex, source, q0: null, angle: 0, smooth: 0, det: new RepDetector(), sign, startedAt: Date.now(), latest: null, held: !MOUNT().pad, state: 'wait', paused: false, trace: [], samples: [], trackStart: 0, raf: 0 };
   source.onSample = (q) => {
     session.latest = q;
     if (session.state === 'cal') return checkStill(q);
@@ -212,7 +218,10 @@ async function startSession(ex) {
     const now = performance.now();
     session.trace.push([now, session.smooth]);
     while (session.trace.length && now - session.trace[0][0] > 8000) session.trace.shift();
-    const rep = session.det.update(session.smooth);
+    if (!session.trackStart) session.trackStart = now;
+    const last = session.samples.at(-1);
+    if (!last || now - session.trackStart - last[0] >= 50) session.samples.push([Math.round(now - session.trackStart), Math.round(session.smooth * 10) / 10]);
+    const rep = session.det.update(session.smooth, now);
     if (rep) onRep(rep);
     scheduleRender();
   };
@@ -241,7 +250,7 @@ const STILL_DEG = 4;
 function calibrate(seconds, restart = false) {
   if (!session) return;
   clearTimeout(session.calTimer);
-  session.q0 = null; session.smooth = 0; session.det = new RepDetector(); session.trace = [];
+  session.q0 = null; session.smooth = 0; session.det = new RepDetector(); session.trace = []; session.samples = []; session.trackStart = 0;
   if (!session.held) { waitForThumb(); return; }
   session.state = 'cal';
   session.calRef = null;
@@ -336,10 +345,11 @@ function live() {
     </div>
     <div class="tiles">
       <div class="tile rep" id="repstat">${ring(0, 44)}<div><div class="v" id="reps">0</div><div class="l">of ${REP_GOAL()} reps</div></div></div>
+      <div class="tile" id="holdtile"><div class="v" id="hold">0.0<small>s</small></div><div class="l">hold</div><div class="t">goal ${HOLD_GOAL()}s each</div></div>
       <div class="tile"><div class="v" id="best-pos">0°</div><div class="l">${ex.pos}</div><div class="t">target ${ex.normal.pos}°</div></div>
       ${ex.neg ? `<div class="tile"><div class="v" id="best-neg">0°</div><div class="l">${ex.neg}</div><div class="t">target ${ex.normal.neg}°</div></div>` : '<div></div>'}
     </div>
-    <p class="cue">${ex.cue.slice(0, -1).join(' ')}</p>
+    <p class="cue">${ex.cue.slice(0, -1).join(' ')} Hold each position ${HOLD_GOAL()}s.</p>
     <div class="row" style="margin-top:10px">
       <button class="small ghost" id="flip">Swap directions</button>
       <button class="small outline" id="recal">Recalibrate</button>
@@ -349,7 +359,7 @@ function live() {
   `;
   liveEls = {
     gauge: app.querySelector('#gauge'), num: app.querySelector('#num'), dir: app.querySelector('#dir'), trace: app.querySelector('#trace'),
-    reps: app.querySelector('#reps'), repstat: app.querySelector('#repstat'), pos: app.querySelector('#best-pos'), neg: app.querySelector('#best-neg'),
+    reps: app.querySelector('#reps'), repstat: app.querySelector('#repstat'), hold: app.querySelector('#hold'), holdtile: app.querySelector('#holdtile'), pos: app.querySelector('#best-pos'), neg: app.querySelector('#best-neg'),
     overlay: app.querySelector('#overlay'), count: app.querySelector('#count'), ovTitle: app.querySelector('#ov-title'), pad: app.querySelector('#pad'),
     state: app.querySelector('#state'), timer: app.querySelector('#timer'),
   };
@@ -386,7 +396,8 @@ function onRep(rep) {
   const n = det.reps.length;
   if (navigator.vibrate) navigator.vibrate(n === REP_GOAL() ? [40, 60, 40, 60, 80] : 30);
   const label = rep.dir > 0 ? ex.pos : ex.neg || ex.pos;
-  speak(n === REP_GOAL() ? `${n}. ${label} ${rep.peak}. Goal reached` : `${n}. ${label} ${rep.peak}`);
+  const held = rep.hold >= 0.5 ? `held ${Math.round(rep.hold)}` : 'no hold';
+  speak(n === REP_GOAL() ? `${n}. ${label} ${rep.peak}, ${held}. Goal reached` : `${n}. ${label} ${rep.peak}, ${held}`);
 }
 
 function renderLive() {
@@ -396,6 +407,12 @@ function renderLive() {
   liveEls.dir.textContent = session.paused ? 'Paused' : Math.abs(angle) < 5 ? 'Neutral' : angle > 0 ? ex.pos : ex.neg || 'Past neutral';
   liveEls.dir.classList.toggle('paused', session.paused);
   liveEls.reps.textContent = det.reps.length;
+  const holding = det.holding(performance.now());
+  const holdShown = holding > 0.2 ? holding : avg(det.reps.map((r) => r.hold));
+  liveEls.hold.innerHTML = `${holdShown.toFixed(1)}<small>s</small>`;
+  liveEls.holdtile.classList.toggle('holding', holding > 0.2);
+  liveEls.holdtile.classList.toggle('met', holding >= HOLD_GOAL());
+  liveEls.holdtile.querySelector('.l').textContent = holding > 0.2 ? 'holding' : 'avg hold';
   const rr = liveEls.repstat.querySelector('.ring');
   if (rr) rr.outerHTML = ring(Math.min(100, Math.round((det.reps.length / REP_GOAL()) * 100)), 44);
   liveEls.pos.textContent = `${Math.round(det.maxPos)}°`;
@@ -470,6 +487,8 @@ function summary() {
   const maxPos = Math.round(det.maxPos), maxNeg = Math.round(det.maxNeg);
   const reps = det.reps;
   const goalHit = reps.length >= REP_GOAL();
+  const avgHold = Math.round(avg(reps.map((r) => r.hold)) * 10) / 10;
+  const holdsMet = reps.filter((r) => r.hold >= HOLD_GOAL()).length;
   let pain = 0;
   app.innerHTML = `
     ${header({ title: 'Session report', right: `<span class="chip ${goalHit ? 'ok' : ''}"><span class="dot"></span>${goalHit ? 'Goal met' : 'Complete'}</span>` })}
@@ -483,6 +502,10 @@ function summary() {
       <div class="row" style="margin-top:4px"><span>${ex.pos}</span><span class="mono muted">${maxPos}° / ${ex.normal.pos}°</span></div>
       <div class="bar"><i style="width:${pctOf(maxPos, ex.normal.pos)}%"></i></div>
       ${ex.neg ? `<div class="row" style="margin-top:12px"><span>${ex.neg}</span><span class="mono muted">${maxNeg}° / ${ex.normal.neg}°</span></div><div class="bar"><i style="width:${pctOf(maxNeg, ex.normal.neg)}%"></i></div>` : ''}
+    </div>
+    <div class="card">
+      <div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Hold per rep</span><span class="mono muted">avg ${avgHold}s · ${holdsMet} of ${reps.length} met ${HOLD_GOAL()}s</span></div>
+      ${reps.length ? holdChart(reps) : '<p class="muted">No reps detected.</p>'}
     </div>
     <div class="card">
       <span class="eyebrow">Peak per rep</span>
@@ -510,10 +533,22 @@ function summary() {
   segment(app.querySelector('#pain'), (v) => { pain = Number(v); app.querySelector('#painv').textContent = `${pain} / 10`; });
   app.querySelector('#back').onclick = () => { session = null; go('home'); };
   app.querySelector('#save').onclick = () => {
-    saveSession({ id: crypto.randomUUID?.() || String(Date.now()), ts: startedAt, exerciseId: ex.id, hand: settings.hand, source: settings.source, mount: settings.mount, reps, maxPos, maxNeg, pain, durationS: secs });
+    saveSession({ id: crypto.randomUUID?.() || String(Date.now()), ts: startedAt, exerciseId: ex.id, hand: settings.hand, source: settings.source, mount: settings.mount, reps, maxPos, maxNeg, avgHold, holdGoal: HOLD_GOAL(), pain, durationS: secs, samples: session.samples });
     session = null; go('progress', ex.id);
   };
   app.querySelector('#discard').onclick = () => { session = null; go('home'); };
+}
+
+function holdChart(reps) {
+  const W = 320, H = 64, goal = HOLD_GOAL(), max = Math.max(goal * 1.3, ...reps.map((r) => r.hold));
+  const slot = (W - 8) / reps.length, bw = Math.min(22, slot - 4);
+  const y = (v) => H - 14 - (v / max) * (H - 18);
+  const bars = reps.map((r, i) => {
+    const x = 4 + i * slot, h = Math.max(2, (r.hold / max) * (H - 18));
+    return `<rect class="${r.hold >= goal ? 'met' : 'short'}" x="${x}" y="${H - 14 - h}" width="${bw}" height="${h}" rx="3"/><text x="${x + bw / 2}" y="${H - 3}" text-anchor="middle" font-size="9" font-family="var(--mono)" fill="var(--text-3)">${r.hold.toFixed(1)}</text>`;
+  }).join('');
+  return `<svg class="reps-chart hold" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="4" x2="${W - 4}" y1="${y(goal)}" y2="${y(goal)}" stroke-dasharray="3 3"/>${bars}</svg>
+    <div class="legend"><span><i class="sw good"></i> met goal</span><span><i class="sw neg"></i> short</span><span class="muted">dashed: ${goal}s goal · seconds under each bar</span></div>`;
 }
 
 function repsChart(ex, reps) {
@@ -560,8 +595,14 @@ function progress(selectedId) {
     };
     block(ex.pos, 'maxPos', ex.normal.pos);
     if (ex.neg) block(ex.neg, 'maxNeg', ex.normal.neg);
-    app.querySelector('#table').innerHTML = `<div class="card"><span class="eyebrow">Session log</span><table><thead><tr><th>Date</th><th>Reps</th><th>${ex.pos}</th>${ex.neg ? `<th>${ex.neg}</th>` : ''}<th>Pain</th></tr></thead><tbody>
-      ${mine.slice().reverse().map((s) => `<tr><td>${new Date(s.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${s.reps.length}</td><td>${s.maxPos}°</td>${ex.neg ? `<td>${s.maxNeg}°</td>` : ''}<td>${s.pain ?? '–'}</td></tr>`).join('')}
+    if (mine.some((s) => s.avgHold != null)) {
+      const wrap = document.createElement('div'); wrap.className = 'card';
+      wrap.innerHTML = `<div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Average hold per set</span><span class="mono muted">goal ${HOLD_GOAL()}s</span></div>`;
+      wrap.appendChild(romChart({ label: 'Average hold', target: HOLD_GOAL(), unit: 's', sessions: mine.map((s) => ({ ts: s.ts, value: s.avgHold ?? 0, reps: s.reps.length, pain: s.pain })) }));
+      charts.appendChild(wrap);
+    }
+    app.querySelector('#table').innerHTML = `<div class="card"><span class="eyebrow">Session log</span><table><thead><tr><th>Date</th><th>Reps</th><th>${ex.pos}</th>${ex.neg ? `<th>${ex.neg}</th>` : ''}<th>Hold</th><th>Pain</th></tr></thead><tbody>
+      ${mine.slice().reverse().map((s) => `<tr><td>${new Date(s.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${s.reps.length}</td><td>${s.maxPos}°</td>${ex.neg ? `<td>${s.maxNeg}°</td>` : ''}<td>${s.avgHold != null ? s.avgHold.toFixed(1) + 's' : '–'}</td><td>${s.pain ?? '–'}</td></tr>`).join('')}
     </tbody></table></div>`;
   }
   app.querySelector('#export').onclick = async () => {
