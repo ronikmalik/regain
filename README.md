@@ -34,7 +34,12 @@ A clinical-instrument UI: dark ground, cyan monitor accent, Inter + JetBrains Mo
    recording the peak of each.
 5. Sets are saved to `localStorage`; the Progress screen charts best ROM per set vs. the healthy target.
 
-Every exercise uses the same grip — the phone held in the palm the way you would read it — so nothing needs strapping on. Starting a set runs a 3-second hold-still countdown to capture the neutral pose, and a voice coach calls out reps and angles because the screen often faces away from you mid-movement. A large **thumb pad** at the bottom-center of the screen (the easy reach zone for either hand) acts as a grip check and dead-man switch: the countdown starts when your thumb is on it and tracking pauses the moment it lifts, so reps only count while the phone is actually held as instructed.
+The measurement is only as good as the coupling between phone and hand, so the app offers two **mounts** (`src/exercises.js` MOUNTS):
+
+- **Strapped to the back of the hand (recommended).** Phone screen-up on the dorsum, held by an elastic band / velcro strap / running armband. No gripping, so finger tension cannot leak into the wrist angle. Sets start with a 5-second countdown; nothing touches the screen.
+- **Hand-held, light edge grip.** Phone upright in the palm, bottom edge on the little finger, finger pads flat on the back, thumb along the side edge with its tip on a corner pad. The pad is a dead-man switch: tracking pauses whenever the thumb lifts. Any change in grip pressure reads as motion, so this mode is the fallback.
+
+Switching mount mirrors the device frame (screen faces away from the palm instead of toward it), which flips the sign of every X/Z-axis exercise (`mountSign`). Each mount has its own illustration, and the starting-position figures show the screen side for the chosen mount. Starting a set runs a hold-still countdown to capture the neutral pose, and a voice coach calls out reps and angles because the screen often faces away from you mid-movement.
 
 Exercises (`src/exercises.js`): wrist flexion/extension, radial/ulnar deviation, forearm
 pronation/supination, elbow flexion, shoulder forward raise. Adding one is a 6-line object.

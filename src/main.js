@@ -1,10 +1,10 @@
-import { EXERCISES, GRIP, byId } from './exercises.js';
+import { EXERCISES, MOUNTS, mountSign, byId } from './exercises.js';
 import { PhoneSource, SimSource, WatchSource } from './motion.js';
 import { relative, twistDeg } from './quat.js';
 import { RepDetector } from './reps.js';
 import { loadSessions, saveSession, clearSessions, loadSettings, saveSettings, exportCsv } from './store.js';
 import { romChart } from './chart.js';
-import { figure } from './figures.js';
+import { figure, mountFigure } from './figures.js';
 
 const app = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -12,6 +12,8 @@ const settings = loadSettings();
 if (params.has('sim')) settings.source = 'sim';
 settings.source ||= 'phone';
 settings.goal ||= 10; // reps per set
+settings.mount ||= 'strap';
+const MOUNT = () => MOUNTS[settings.mount] || MOUNTS.strap;
 
 let session = null; // active session state
 const REP_GOAL = () => settings.goal;
@@ -57,7 +59,7 @@ const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(
 const screens = { home, setup, live, summary, progress };
 function go(name, arg) {
   window.scrollTo(0, 0);
-  app.classList.remove('live');
+  app.classList.remove('live', 'haspad');
   screens[name](arg);
   app.classList.remove('screen'); void app.offsetWidth; app.classList.add('screen');
 }
@@ -82,6 +84,7 @@ function home() {
     </div>
     <div class="card config">
       <span class="eyebrow">Session config</span>
+      <div class="row"><span>Phone mount</span><div class="seg" id="mount"><button aria-pressed="${settings.mount === 'strap'}" data-v="strap">Strapped</button><button aria-pressed="${settings.mount === 'held'}" data-v="held">Hand-held</button></div></div>
       <div class="row"><span>Injured side</span><div class="seg" id="hand"><button aria-pressed="${settings.hand === 'left'}" data-v="left">Left</button><button aria-pressed="${settings.hand === 'right'}" data-v="right">Right</button></div></div>
       <div class="row"><span>Sensor</span><div class="seg" id="source"><button aria-pressed="${settings.source === 'phone'}" data-v="phone">Phone</button><button aria-pressed="${settings.source === 'watch'}" data-v="watch">Watch</button><button aria-pressed="${settings.source === 'sim'}" data-v="sim">Sim</button></div></div>
       <div class="row"><span>Voice coach</span><div class="seg" id="voice"><button aria-pressed="${settings.voice !== false}" data-v="on">On</button><button aria-pressed="${settings.voice === false}" data-v="off">Off</button></div></div>
@@ -100,6 +103,7 @@ function home() {
   `;
   app.querySelector('#progress').onclick = () => go('progress');
   segment(app.querySelector('#hand'), (v) => { settings.hand = v; saveSettings(settings); });
+  segment(app.querySelector('#mount'), (v) => { settings.mount = v; saveSettings(settings); });
   segment(app.querySelector('#source'), (v) => { settings.source = v; saveSettings(settings); home(); });
   segment(app.querySelector('#voice'), (v) => { settings.voice = v === 'on'; saveSettings(settings); });
   segment(app.querySelector('#goal'), (v) => { settings.goal = Number(v); saveSettings(settings); });
@@ -138,12 +142,18 @@ function setup(ex) {
   app.innerHTML = `
     ${header({ title: `${ex.joint} · ${ex.name}`, right: `<span class="chip">${settings.hand} hand</span>` })}
     <div class="card figwrap">
+      <div class="row" style="margin:0 0 4px"><span class="eyebrow" style="margin:0">Phone mount · ${MOUNT().name}</span><span class="chip ${settings.mount === 'strap' ? 'ok' : 'warn'}"><span class="dot"></span>${MOUNT().tag}</span></div>
+      ${mountFigure(settings.mount, settings.hand)}
+      <p class="muted" style="margin:6px 0 8px">${MOUNT().summary}</p>
+      <div class="seg" id="mount" style="display:flex"><button aria-pressed="${settings.mount === 'strap'}" data-v="strap" style="flex:1">Strapped</button><button aria-pressed="${settings.mount === 'held'}" data-v="held" style="flex:1">Hand-held</button></div>
+    </div>
+    <div class="card figwrap">
       <span class="eyebrow">Starting position</span>
-      ${figure(ex.id, settings.hand)}
+      ${figure(ex.id, settings.hand, settings.mount)}
       <div class="legend"><span><i class="sw screen"></i> screen side</span><span><i class="sw pos"></i> ${ex.pos}</span>${ex.neg ? `<span><i class="sw neg"></i> ${ex.neg}</span>` : ''}</div>
     </div>
     <div class="card grip">
-      <div class="step"><span class="n">01</span><div><span class="eyebrow">Grip</span><p>${GRIP}</p></div></div>
+      <div class="step"><span class="n">01</span><div><span class="eyebrow">Mount the phone</span><p>${MOUNT().how}</p></div></div>
       <div class="step"><span class="n">02</span><div><span class="eyebrow">Position</span><p>${ex.arm}</p></div></div>
       <div class="step"><span class="n">03</span><div><span class="eyebrow">Movement</span><p>${ex.cue}</p></div></div>
     </div>
@@ -152,11 +162,14 @@ function setup(ex) {
       ${ex.neg ? `<div class="target"><div class="k">${ex.neg} · normal</div><div class="v">${ex.normal.neg}°</div></div>` : ''}
       <div class="target"><div class="k">Rep goal</div><div class="v">${REP_GOAL()}<small>reps</small></div></div>
     </div>
-    <p class="muted">Tap Start with your other hand, then rest your thumb on the pad. The countdown begins once your thumb is on it and the set only counts while it stays there${settings.voice !== false ? '. The voice coach calls out every rep' : ''}. Move slowly; stop on sharp pain.</p>
+    <p class="muted">${MOUNT().pad
+      ? 'Tap Start with your other hand, then rest your thumb on the corner pad. The countdown begins once your thumb is on it and the set only counts while it stays there'
+      : 'Tap Start with your other hand and get into the starting position during the ' + MOUNT().countdown + '-second countdown. Nothing touches the screen during the set'}${settings.voice !== false ? '. The voice coach calls out every rep' : ''}. Move slowly; stop on sharp pain.</p>
     <div id="err"></div>
     <button class="primary block" id="start">Start session</button>
   `;
   app.querySelector('#back').onclick = () => go('home');
+  segment(app.querySelector('#mount'), (v) => { settings.mount = v; saveSettings(settings); setup(ex); });
   app.querySelector('#start').onclick = async () => {
     const btn = app.querySelector('#start');
     btn.disabled = true; btn.textContent = 'Connecting sensors…';
@@ -164,7 +177,7 @@ function setup(ex) {
     try {
       await startSession(ex);
       go('live');
-      waitForThumb();
+      if (MOUNT().pad) waitForThumb(); else calibrate(MOUNT().countdown);
     } catch (e) {
       btn.disabled = false; btn.textContent = 'Start session';
       app.querySelector('#err').innerHTML = `<div class="card error">${e.message}</div>`;
@@ -181,8 +194,8 @@ function makeSource(ex) {
 
 async function startSession(ex) {
   const source = makeSource(ex);
-  const sign = ex.sign * (ex.handed && settings.hand === 'left' ? -1 : 1) * (settings.flips?.[ex.id] ? -1 : 1);
-  session = { ex, source, q0: null, angle: 0, smooth: 0, det: new RepDetector(), sign, startedAt: Date.now(), latest: null, held: false, state: 'wait', paused: false, trace: [], raf: 0 };
+  const sign = ex.sign * mountSign(ex, settings.mount) * (ex.handed && settings.hand === 'left' ? -1 : 1) * (settings.flips?.[ex.id] ? -1 : 1);
+  session = { ex, source, q0: null, angle: 0, smooth: 0, det: new RepDetector(), sign, startedAt: Date.now(), latest: null, held: !MOUNT().pad, state: 'wait', paused: false, trace: [], raf: 0 };
   source.onSample = (q) => {
     session.latest = q;
     if (!session.q0 || session.state !== 'track' || session.paused) return; // waiting for thumb / countdown / paused
@@ -262,7 +275,7 @@ function setHeld(held) {
   session.held = held;
   liveEls.pad.classList.toggle('held', held);
   if (held) {
-    if (session.state === 'wait') calibrate(3);
+    if (session.state === 'wait') calibrate(MOUNT().countdown);
     else if (session.state === 'track' && session.paused) { session.paused = false; setState('track'); renderLive(); speak('Go'); }
   } else {
     if (session.state === 'cal') { clearTimeout(session.calTimer); waitForThumb(); }
@@ -295,7 +308,7 @@ function live() {
   app.innerHTML = `
     ${header({ title: ex.name, right: `<span class="chip warn" id="state"><span class="dot"></span>Waiting</span>` })}
     <div class="overlay" id="overlay" hidden><div class="eyebrow" id="ov-title">Hold the starting position</div><div class="count" id="count">3</div><p class="muted">${ex.arm}</p></div>
-    <button class="thumbpad" id="pad" aria-label="Thumb pad: keep your thumb here during the set">${THUMB}<span>Thumb here</span></button>
+    ${MOUNT().pad ? `<button class="thumbpad corner" id="pad" data-side="${settings.hand}" aria-label="Thumb pad: keep your thumb here during the set">${THUMB}<span>Thumb here</span></button>` : ''}
     <div class="card monitor">
       <div class="mhead"><span class="eyebrow">${ex.joint} · ${settings.hand} · ${SOURCE_LABEL[settings.source]}</span><span class="timer" id="timer">00:00</span></div>
       <svg class="gauge" viewBox="0 0 300 170" id="gauge"></svg>
@@ -313,7 +326,7 @@ function live() {
       <button class="small outline" id="recal">Recalibrate</button>
     </div>
     <button class="primary block" id="finish">Finish set</button>
-    <p class="muted" style="text-align:center">Keep your thumb on the pad. The set only counts while it is there.</p>
+    <p class="muted" style="text-align:center">${MOUNT().pad ? 'Keep your thumb on the corner pad. The set only counts while it is there.' : 'Strapped mode: nothing needs to touch the screen. Use Recalibrate if the phone shifts.'}</p>
   `;
   liveEls = {
     gauge: app.querySelector('#gauge'), num: app.querySelector('#num'), dir: app.querySelector('#dir'), trace: app.querySelector('#trace'),
@@ -322,8 +335,11 @@ function live() {
     state: app.querySelector('#state'), timer: app.querySelector('#timer'),
   };
   app.classList.add('live');
+  app.classList.toggle('haspad', !!MOUNT().pad);
   const pad = liveEls.pad;
-  if (settings.source === 'sim') {
+  if (!pad) {
+    // strapped: no dead-man switch
+  } else if (settings.source === 'sim') {
     pad.onclick = () => setHeld(!session.held); // desktop: click toggles so the keyboard stays free
   } else {
     pad.onpointerdown = (e) => { e.preventDefault(); try { pad.setPointerCapture(e.pointerId); } catch {} setHeld(true); };
@@ -332,7 +348,7 @@ function live() {
   }
   session.clock = setInterval(() => { if (liveEls) liveEls.timer.textContent = fmtTime(Math.round((Date.now() - session.startedAt) / 1000)); }, 1000);
   app.querySelector('#back').onclick = () => { endSession(); session = null; go('home'); };
-  app.querySelector('#recal').onclick = () => calibrate(3);
+  app.querySelector('#recal').onclick = () => calibrate(MOUNT().countdown);
   app.querySelector('#flip').onclick = () => {
     settings.flips[ex.id] = !settings.flips[ex.id]; saveSettings(settings);
     session.sign *= -1; session.det = new RepDetector(); session.smooth = 0; session.trace = [];
@@ -459,6 +475,7 @@ function summary() {
       <div class="kv"><span>Side</span><b>${settings.hand}</b></div>
       <div class="kv"><span>Duration</span><b>${fmtTime(secs)}</b></div>
       <div class="kv"><span>Sensor</span><b>${SOURCE_LABEL[settings.source]}</b></div>
+      <div class="kv"><span>Mount</span><b>${MOUNT().short}</b></div>
       <div class="kv"><span>Recorded</span><b>${new Date(startedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</b></div>
     </div>
     <div class="card">
@@ -474,7 +491,7 @@ function summary() {
   segment(app.querySelector('#pain'), (v) => { pain = Number(v); app.querySelector('#painv').textContent = `${pain} / 10`; });
   app.querySelector('#back').onclick = () => { session = null; go('home'); };
   app.querySelector('#save').onclick = () => {
-    saveSession({ id: crypto.randomUUID?.() || String(Date.now()), ts: startedAt, exerciseId: ex.id, hand: settings.hand, source: settings.source, reps, maxPos, maxNeg, pain, durationS: secs });
+    saveSession({ id: crypto.randomUUID?.() || String(Date.now()), ts: startedAt, exerciseId: ex.id, hand: settings.hand, source: settings.source, mount: settings.mount, reps, maxPos, maxNeg, pain, durationS: secs });
     session = null; go('progress', ex.id);
   };
   app.querySelector('#discard').onclick = () => { session = null; go('home'); };

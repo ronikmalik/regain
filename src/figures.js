@@ -5,8 +5,11 @@
 
 const W = 300, H = 230;
 
-function helpers(mirror) {
+const FLIP = { left: 'right', right: 'left', up: 'down', down: 'up' };
+
+function helpers(mirror, mount = 'held') {
   const X = (x) => (mirror ? W - x : x);
+  const strap = mount === 'strap';
   const anchor = (a) => (!mirror ? a : a === 'start' ? 'end' : a === 'end' ? 'start' : a);
   return {
     X,
@@ -15,6 +18,7 @@ function helpers(mirror) {
     circle: (cx, cy, r, fill = 'var(--text)', extra = '') => `<circle cx="${X(cx)}" cy="${cy}" r="${r}" fill="${fill}" ${extra}/>`,
     // phone seen edge-on: a thin bar with the screen side highlighted. dir = which side the screen faces ('left'|'right'|'up'|'down')
     phoneEdge: (x, y, len, vertical, screenSide) => {
+      if (strap) screenSide = FLIP[screenSide]; // strapped: screen faces away from the palm
       const t = 9;
       const body = vertical
         ? `<rect x="${X(x) - t / 2}" y="${y}" width="${t}" height="${len}" rx="3" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`
@@ -30,7 +34,12 @@ function helpers(mirror) {
       return body + s;
     },
     // phone seen face-on (back of the phone): rounded rect along the forearm
-    phoneBack: (x, y, w, h) => `<rect x="${Math.min(X(x), X(x + w))}" y="${y}" width="${w}" height="${h}" rx="6" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`,
+    phoneBack: (x, y, w, h) => {
+      const bx = Math.min(X(x), X(x + w));
+      const body = `<rect x="${bx}" y="${y}" width="${w}" height="${h}" rx="6" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`;
+      // strapped: from this side we see the SCREEN, not the back
+      return strap ? body + `<rect x="${bx + 5}" y="${y + 4}" width="${w - 10}" height="${h - 8}" rx="3" fill="var(--good)" opacity="0.55"/>` : body;
+    },
     // curved arrow from (x1,y1) to (x2,y2); sweep flips automatically when mirrored
     arc: (x1, y1, x2, y2, r, sweep, color = 'var(--accent)') =>
       `<path d="M${X(x1)},${y1} A${r},${r} 0 0 ${mirror ? 1 - sweep : sweep} ${X(x2)},${y2}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" marker-end="url(#ah-${color === 'var(--accent)' ? 'a' : 'w'})"/>`,
@@ -88,7 +97,7 @@ const FIGURES = {
     s += h.arc(214, 138, 236, 172, 40, 1, 'var(--warn)'); // ulnar: tip down
     s += h.text(252, 76, 'Radial', 'middle', 'var(--accent)');
     s += h.text(252, 188, 'Ulnar', 'middle', 'var(--warn)');
-    s += h.text(150, 215, 'Side view · screen faces your body', 'middle', 'var(--text-3)', 11);
+    s += h.text(150, 215, 'Side view · palm faces your body', 'middle', 'var(--text-3)', 11);
     return s;
   },
 
@@ -139,9 +148,61 @@ const FIGURES = {
   },
 };
 
-export function figure(exerciseId, hand) {
+export function figure(exerciseId, hand, mount = 'held') {
   const draw = FIGURES[exerciseId];
   if (!draw) return '';
-  const h = helpers(hand === 'left');
+  const h = helpers(hand === 'left', mount);
   return `<svg class="figure" viewBox="0 0 ${W} ${H}" role="img" aria-label="Starting position for the ${hand} hand">${defs}${draw(h)}</svg>`;
+}
+
+// ---------- how to mount the phone ----------
+const MOUNT_FIGS = {
+  // Back of the hand, fingers up, phone strapped screen-up with two elastic loops.
+  strap: (h) => {
+    let g = '';
+    const skin = 'var(--text-3)';
+    g += `<rect x="${Math.min(h.X(122), h.X(178))}" y="176" width="56" height="34" rx="14" fill="${skin}"/>`; // forearm
+    g += `<rect x="${Math.min(h.X(100), h.X(200))}" y="88" width="100" height="96" rx="26" fill="${skin}"/>`; // back of hand
+    for (const [x, hgt] of [[104, 58], [128, 70], [152, 66], [176, 50]]) {                      // fingers
+      g += `<rect x="${Math.min(h.X(x), h.X(x + 20))}" y="${94 - hgt}" width="20" height="${hgt + 10}" rx="10" fill="${skin}"/>`;
+    }
+    g += h.line(104, 140, 66, 104, 22, skin) + h.line(66, 104, 52, 84, 18, skin);              // thumb (left side of a right hand seen from the back)
+    // phone, screen up, top toward the fingers
+    g += `<rect x="${Math.min(h.X(124), h.X(176))}" y="86" width="52" height="102" rx="8" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`;
+    g += `<rect x="${Math.min(h.X(129), h.X(171))}" y="92" width="42" height="90" rx="4" fill="var(--good)" opacity="0.5"/>`;
+    g += `<path d="M${h.X(138)},140 a12,12 0 0 1 24,0" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`; // gauge glyph on screen
+    // two elastic loops across phone + hand
+    for (const y of [98, 166]) {
+      g += `<rect x="${Math.min(h.X(94), h.X(206))}" y="${y}" width="112" height="14" rx="4" fill="var(--accent)" opacity="0.9"/>`;
+      g += `<rect x="${Math.min(h.X(94), h.X(206))}" y="${y + 4}" width="112" height="2" fill="#fff" opacity="0.35"/>`;
+    }
+    g += h.text(214, 108, 'elastic band', 'start', 'var(--accent)', 10) + h.text(214, 176, 'or velcro', 'start', 'var(--accent)', 10);
+    g += h.text(150, 224, 'Back of hand · screen up · fingers relaxed', 'middle', 'var(--text-3)', 11);
+    return g;
+  },
+  // Front view of the held phone: thumb along the side edge with its tip on the corner pad,
+  // finger pads flat on the back (visible only past the far edge), little finger under the bottom edge.
+  held: (h) => {
+    let g = '';
+    const skin = 'var(--text-3)';
+    g += `<rect x="${Math.min(h.X(150), h.X(262))}" y="60" width="112" height="176" rx="40" fill="${skin}" opacity="0.55"/>`; // palm behind
+    for (const y of [56, 88, 120, 152]) g += `<rect x="${Math.min(h.X(74), h.X(150))}" y="${y}" width="76" height="24" rx="12" fill="${skin}"/>`; // fingers behind, pads on the back
+    g += `<rect x="${Math.min(h.X(96), h.X(196))}" y="192" width="100" height="22" rx="11" fill="${skin}"/>`; // little finger under the bottom edge
+    // phone, screen toward us
+    g += `<rect x="${Math.min(h.X(110), h.X(190))}" y="26" width="80" height="164" rx="12" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`;
+    g += `<rect x="${Math.min(h.X(116), h.X(184))}" y="34" width="68" height="148" rx="7" fill="var(--good)" opacity="0.28"/>`;
+    // corner pad zone (lower thumb-side corner)
+    g += `<path d="M${h.X(184)},182 L${h.X(184)},128 A54,54 0 0 ${h.X(1) > h.X(0) ? 0 : 1} ${h.X(130)},182 Z" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    // thumb from the lower right, tip on the pad zone, resting along the edge (never on the middle of the screen)
+    g += h.line(226, 202, 204, 176, 26, skin) + h.line(204, 176, 178, 160, 22, skin);
+    g += h.text(150, 224, 'Thumb tip on the corner pad · finger pads flat on the back', 'middle', 'var(--text-3)', 11);
+    return g;
+  },
+};
+
+export function mountFigure(mount, hand) {
+  const draw = MOUNT_FIGS[mount];
+  if (!draw) return '';
+  const h = helpers(hand === 'left');
+  return `<svg class="figure" viewBox="0 0 ${W} ${H}" role="img" aria-label="How to mount the phone: ${mount}">${defs}${draw(h)}</svg>`;
 }
