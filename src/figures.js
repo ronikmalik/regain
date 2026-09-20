@@ -192,7 +192,7 @@ const MOUNT_FIGS = {
     g += `<rect x="${Math.min(h.X(px), h.X(px + pw))}" y="${py}" width="${pw}" height="${ph}" rx="12" fill="#0b1118" stroke="var(--text-2)" stroke-width="2"/>`;
     g += `<rect x="${Math.min(h.X(px + 6), h.X(px + pw - 6))}" y="${py + 8}" width="${pw - 12}" height="${ph - 16}" rx="7" fill="var(--good)" opacity="0.22"/>`;
     // fingers behind the phone (x-ray), from the bottom edge up
-    const behind = locked ? [[px + 27, 52], [px + 46, 58]] : [[px + 8, 66], [px + 27, 52], [px + 46, 58], [px + 65, 80]];
+    const behind = locked ? [] : [[px + 8, 66], [px + 27, 52], [px + 46, 58], [px + 65, 80]];
     for (const [x, top] of behind) {
       g += `<rect x="${Math.min(h.X(x), h.X(x + 15))}" y="${top}" width="15" height="${py + ph - 6 - top}" rx="7.5" fill="${skin}" opacity="0.4" stroke="${skin}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
     }
@@ -202,12 +202,16 @@ const MOUNT_FIGS = {
     // thumb comes straight up from below the bottom edge, beside the index finger, and lies over the screen up to the pad
     g += h.line(px + pw - 16, py + ph + 10, px + pw - 14, py + ph - 10, 19, skin) + h.line(px + pw - 14, py + ph - 10, px + pw / 2 + 8, py + ph - 42, 16, skin);
     if (locked) {
-      // index finger hooks the thumb-side edge, little finger hooks the far edge (x-ray shaft behind, solid tip over the edge)
-      for (const [x, top, tipY] of [[px + 65, 84, 74], [px + 8, 104, 96]]) {
-        g += `<rect x="${Math.min(h.X(x), h.X(x + 15))}" y="${top}" width="15" height="${py + ph - 6 - top}" rx="7.5" fill="${skin}" opacity="0.4" stroke="${skin}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
-        const over = x > px + pw / 2 ? [px + pw - 12, px + pw + 6] : [px - 6, px + 12];
-        g += `<rect x="${Math.min(h.X(over[0]), h.X(over[1]))}" y="${tipY}" width="18" height="22" rx="9" fill="${skin}"/>`;
-      }
+      // fingers fan out from the palm behind the phone (x-ray). Index and little finger angle
+      // outward and their tips hook over the side edges (solid); middle and ring support the back.
+      const xray = 'opacity="0.42"';
+      const base = py + ph - 14;
+      g += h.line(px + 62, base, px + pw - 3, py + 76, 15, skin, xray);   // index, angled to the thumb-side edge
+      g += h.line(px + 44, base, px + 50, py + 46, 15, skin, xray);       // middle, nearly straight
+      g += h.line(px + 30, base, px + 27, py + 54, 15, skin, xray);       // ring, slight lean away
+      g += h.line(px + 16, base, px - 1, py + 100, 13, skin, xray);       // little finger, angled to the far edge
+      g += h.line(px + pw - 3, py + 76, px + pw + 1, py + 56, 15, skin);  // index tip hooked over the edge
+      g += h.line(px - 1, py + 100, px - 4, py + 84, 13, skin);           // little finger tip hooked over the edge
     }
     g += h.text(px + pw / 2, 214, locked ? 'index and little finger hook the edges' : 'fingers straight behind the phone', 'middle', 'var(--text-2)', 10);
     // inset: edge view, fingers horizontal, phone lying on them, thumb wrapped round the bottom edge, lying flat on the screen
