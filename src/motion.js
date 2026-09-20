@@ -47,6 +47,7 @@ export class SimSource {
     const emit = () => { out.value = input.value; this.onSample?.(mul(this._base, fromAxisAngle(this.axis, Number(input.value)))); };
     input.addEventListener('input', emit);
     this._key = (e) => {
+      if (e.key.startsWith('Arrow')) e.preventDefault();
       if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { input.value = Number(input.value) + 5; emit(); }
       if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { input.value = Number(input.value) - 5; emit(); }
     };
