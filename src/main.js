@@ -1,4 +1,4 @@
-import { EXERCISES, byId } from './exercises.js';
+import { EXERCISES, GRIP, byId } from './exercises.js';
 import { PhoneSource, SimSource, WatchSource } from './motion.js';
 import { relative, twistDeg } from './quat.js';
 import { RepDetector } from './reps.js';
@@ -24,7 +24,7 @@ function home() {
   const sessions = loadSessions();
   app.innerHTML = `
     <div class="topbar"><h1>Regain</h1><button class="small" id="progress">Progress${sessions.length ? ` (${sessions.length})` : ''}</button></div>
-    <p class="muted">Motion-tracked physical therapy for wrist, hand and arm recovery. Not medical advice — follow your therapist's plan.</p>
+    <p class="muted">Hold your phone like you normally would — it measures your joint angles, counts reps and tracks recovery. Not medical advice; follow your therapist's plan.</p>
     <div class="row">
       <span class="eyebrow">Injured side</span>
       <div class="seg" id="hand">
@@ -40,6 +40,13 @@ function home() {
         <button aria-pressed="${settings.source === 'sim'}" data-v="sim">Sim</button>
       </div>
     </div>
+    <div class="row">
+      <span class="eyebrow">Voice coach</span>
+      <div class="seg" id="voice">
+        <button aria-pressed="${settings.voice !== false}" data-v="on">On</button>
+        <button aria-pressed="${settings.voice === false}" data-v="off">Off</button>
+      </div>
+    </div>
     ${settings.source === 'watch' ? `<div class="card"><span class="eyebrow">Relay URL</span><input id="relay" type="url" value="${settings.relayUrl || 'ws://localhost:8787'}" style="width:100%;margin-top:6px;font:inherit;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text)"><p class="muted">Apple Watch data arrives via the Sensor Logger app → <code>npm run relay</code>. See README.</p></div>` : ''}
     ${Object.entries(grouped).map(([joint, list]) => `
       <h2>${joint}</h2>
@@ -49,6 +56,7 @@ function home() {
   app.querySelector('#progress').onclick = () => go('progress');
   segment(app.querySelector('#hand'), (v) => { settings.hand = v; saveSettings(settings); });
   segment(app.querySelector('#source'), (v) => { settings.source = v; saveSettings(settings); home(); });
+  segment(app.querySelector('#voice'), (v) => { settings.voice = v === 'on'; saveSettings(settings); });
   app.querySelector('#relay')?.addEventListener('change', (e) => { settings.relayUrl = e.target.value; saveSettings(settings); });
   app.querySelectorAll('.card.tap').forEach((c) => (c.onclick = () => go('setup', byId(c.dataset.id))));
 }
@@ -72,24 +80,64 @@ function lastFor(sessions, ex) {
 function setup(ex) {
   app.innerHTML = `
     <div class="topbar"><button class="small ghost" id="back">‹ Back</button><h1>${ex.joint}: ${ex.name}</h1></div>
-    <div class="card"><span class="eyebrow">Setup</span><p>${ex.setup}</p></div>
-    <div class="card"><span class="eyebrow">Movement</span><p>${ex.cue}</p></div>
-    <p class="muted">Target (healthy range): ${ex.pos} ${ex.normal.pos}°${ex.neg ? `, ${ex.neg} ${ex.normal.neg}°` : ''}. Move slowly and stop if you feel sharp pain.</p>
+    <div class="card grip">
+      <div class="step"><span class="n">1</span><div><span class="eyebrow">Grip</span><p>${GRIP}</p></div></div>
+      <div class="step"><span class="n">2</span><div><span class="eyebrow">Starting position</span><p>${ex.arm}</p></div></div>
+      <div class="step"><span class="n">3</span><div><span class="eyebrow">Movement</span><p>${ex.cue}</p></div></div>
+    </div>
+    <p class="muted">Healthy range: ${ex.pos} ${ex.normal.pos}°${ex.neg ? `, ${ex.neg} ${ex.normal.neg}°` : ''}. Move slowly and stop if you feel sharp pain.</p>
+    <p class="muted">Tap Start with your other hand, then hold the starting position still for the 3-second countdown${settings.voice !== false ? ' — the voice coach will call out your reps so you don\'t need to watch the screen' : ''}.</p>
     <div id="err"></div>
-    <button class="primary block" id="start">Calibrate &amp; start</button>
+    <button class="primary block" id="start">Start</button>
   `;
   app.querySelector('#back').onclick = () => go('home');
   app.querySelector('#start').onclick = async () => {
     const btn = app.querySelector('#start');
     btn.disabled = true; btn.textContent = 'Starting sensors…';
+    try { if (settings.voice !== false) speechSynthesis?.speak(new SpeechSynthesisUtterance('')); } catch {} // iOS: unlock speech inside the tap
     try {
       await startSession(ex);
       go('live');
+      calibrate(3);
     } catch (e) {
-      btn.disabled = false; btn.textContent = 'Calibrate & start';
+      btn.disabled = false; btn.textContent = 'Start';
       app.querySelector('#err').innerHTML = `<div class="card error">${e.message}</div>`;
     }
   };
+}
+
+// Hold-still countdown, then the current pose becomes neutral. Also used by Recalibrate.
+function calibrate(seconds) {
+  if (!session) return;
+  session.q0 = null; session.smooth = 0; session.det = new RepDetector();
+  let n = seconds;
+  const tick = () => {
+    if (!session || !liveEls) return;
+    if (n > 0) {
+      liveEls.overlay.hidden = false;
+      liveEls.count.textContent = n;
+      speak(n === seconds ? `Hold still. ${n}` : String(n));
+      n -= 1;
+      session.calTimer = setTimeout(tick, 1000);
+    } else {
+      session.q0 = session.latest;
+      liveEls.overlay.hidden = true;
+      speak('Go');
+      if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+    }
+  };
+  clearTimeout(session.calTimer);
+  tick();
+}
+
+function speak(text) {
+  if (settings.voice === false || !('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.1;
+    speechSynthesis.speak(u);
+  } catch {}
 }
 
 function makeSource(ex) {
@@ -104,7 +152,7 @@ async function startSession(ex) {
   session = { ex, source, q0: null, angle: 0, smooth: 0, det: new RepDetector(), sign, startedAt: Date.now(), latest: null };
   source.onSample = (q) => {
     session.latest = q;
-    if (!session.q0) session.q0 = q; // first sample after start = neutral pose
+    if (!session.q0) return; // still in the hold-still countdown
     const raw = twistDeg(relative(session.q0, q), ex.axis) * session.sign;
     session.smooth += (raw - session.smooth) * 0.35;
     session.angle = Math.round(session.smooth);
@@ -117,8 +165,10 @@ async function startSession(ex) {
 }
 
 function endSession() {
+  clearTimeout(session?.calTimer);
   session?.source.stop();
   session?.wake?.release?.();
+  try { speechSynthesis?.cancel(); } catch {}
 }
 
 // ---------- live ----------
@@ -127,6 +177,7 @@ function live() {
   const { ex } = session;
   app.innerHTML = `
     <div class="topbar"><button class="small ghost" id="cancel">✕</button><h1>${ex.name}</h1><button class="small" id="recal">Recalibrate</button></div>
+    <div class="overlay" id="overlay" hidden><div class="eyebrow">Hold the starting position</div><div class="count" id="count">3</div><p class="muted">${ex.arm}</p></div>
     <svg class="gauge" viewBox="0 0 300 170" id="gauge"></svg>
     <div class="angle"><div class="num" id="num">0°</div><div class="dir" id="dir">Hold neutral</div></div>
     <div class="stats">
@@ -144,22 +195,27 @@ function live() {
   liveEls = {
     gauge: app.querySelector('#gauge'), num: app.querySelector('#num'), dir: app.querySelector('#dir'),
     reps: app.querySelector('#reps'), repstat: app.querySelector('#repstat'), pos: app.querySelector('#best-pos'), neg: app.querySelector('#best-neg'),
+    overlay: app.querySelector('#overlay'), count: app.querySelector('#count'),
   };
   app.querySelector('#cancel').onclick = () => { endSession(); session = null; go('home'); };
-  app.querySelector('#recal').onclick = () => { session.q0 = session.latest; session.smooth = 0; };
+  app.querySelector('#recal').onclick = () => calibrate(3);
   app.querySelector('#flip').onclick = () => {
     settings.flips[ex.id] = !settings.flips[ex.id]; saveSettings(settings);
     session.sign *= -1; session.det = new RepDetector(); session.smooth = 0;
+    speak('Directions swapped');
   };
   app.querySelector('#finish').onclick = () => { endSession(); go('summary'); };
   renderLive();
 }
 
-function onRep() {
+function onRep(rep) {
   liveEls?.repstat.classList.remove('flash');
   void liveEls?.repstat.offsetWidth;
   liveEls?.repstat.classList.add('flash');
   if (navigator.vibrate) navigator.vibrate(30);
+  const { ex, det } = session;
+  const label = rep.dir > 0 ? ex.pos : ex.neg || ex.pos;
+  speak(`${det.reps.length}. ${label} ${rep.peak}`);
 }
 
 function renderLive() {
@@ -223,6 +279,7 @@ function summary() {
     <button class="primary block" id="save">Save set</button>
     <button class="block ghost" id="discard">Discard</button>
   `;
+  speak(`Set complete. ${det.reps.length} reps. Best ${ex.pos} ${maxPos}${ex.neg ? `, best ${ex.neg} ${maxNeg}` : ''}.`);
   const pain = app.querySelector('#pain');
   pain.oninput = () => (app.querySelector('#painv').textContent = `${pain.value} / 10`);
   app.querySelector('#save').onclick = () => {

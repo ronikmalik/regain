@@ -97,3 +97,16 @@ textarea { width: 100%; font: 12px monospace; background: var(--surface); color:
 /* desktop simulator */
 .sim { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface-2); border-top: 1px solid var(--border); font-size: 13px; }
 .sim input { width: 100%; }
+
+/* setup steps */
+.grip .step { display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.grip .step:first-child { border-top: 0; padding-top: 0; }
+.grip .step:last-child { padding-bottom: 0; }
+.grip .n { flex: 0 0 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; display: grid; place-items: center; margin-top: 2px; }
+.grip p { margin: 4px 0 0; }
+
+/* hold-still countdown */
+.overlay { position: fixed; inset: 0; background: rgba(15, 23, 32, 0.96); z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+.overlay[hidden] { display: none; }
+.overlay .count { font-size: 120px; font-weight: 800; line-height: 1; margin: 12px 0; font-variant-numeric: tabular-nums; }
+.overlay p { max-width: 320px; }
