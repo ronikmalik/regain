@@ -323,3 +323,29 @@ textarea { width: 100%; font: 12px var(--mono); background: var(--surface); colo
 .chart.scatter .pt.recent { fill: var(--text); opacity: 1; }
 .legend .sw.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); opacity: 0.7; }
 .legend .sw.dot.recent { background: var(--text); opacity: 1; }
+
+/* therapist report */
+.doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.doc-head .word { font-weight: 800; letter-spacing: 0.18em; font-size: 15px; }
+.doc-head .sub { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--text-3); margin-top: 3px; }
+.kvgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px 14px; }
+.kvgrid div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--border); padding: 5px 0; font-size: 13px; }
+.kvgrid span { color: var(--text-3); }
+.kvgrid b { font-family: var(--mono); font-weight: 600; }
+.tablewrap { overflow-x: auto; }
+.doc table { font-size: 12px; }
+
+@media print {
+  :root {
+    --bg: #ffffff; --bg-2: #ffffff; --surface: #ffffff; --surface-2: #f3f5f7; --surface-3: #e6eaef;
+    --border: #d5dbe2; --border-2: #c3cad3; --text: #111418; --text-2: #3b4550; --text-3: #6b7683;
+    --accent: #0a7f95; --accent-2: #0a7f95; --accent-soft: rgba(10, 127, 149, 0.10); --accent-glow: transparent;
+    --good: #128a5c; --warn: #b7791f; --bad: #c0392b; --shadow: none;
+  }
+  body { background: #fff; padding: 0; }
+  main { max-width: none; padding: 0; }
+  .hdr .back, .noprint, .thumbpad, .sim { display: none !important; }
+  .card { break-inside: avoid; box-shadow: none; margin: 8px 0; }
+  .readout .num { text-shadow: none; }
+  .chart.timeline .band { opacity: 0.12; }
+}

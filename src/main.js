@@ -8,6 +8,7 @@ import { computeMetrics } from './metrics.js';
 import { drawGauge } from './gauge.js';
 import { replayCard, overlayChart } from './replay.js';
 import { weeklySummary, calendarSvg, streakInfo, painInsight, painScatterSvg } from './insights.js';
+import { renderReport as renderTherapistReport } from './report.js';
 import { figure, mountFigure } from './figures.js';
 
 const app = document.getElementById('app');
@@ -64,7 +65,8 @@ const lines = (arr) => `<ol class="steps">${arr.map((t) => `<li>${t}</li>`).join
 const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 // ---------- routing ----------
-const screens = { home, setup, live, summary, progress, viewSet };
+const screens = { home, setup, live, summary, progress, viewSet, report };
+function report() { renderTherapistReport({ app, settings, header, go, holdGoal: HOLD_GOAL(), repGoal: REP_GOAL() }); }
 function go(name, arg) {
   window.scrollTo(0, 0);
   app.querySelectorAll('.replay').forEach((el) => el.stop?.());
@@ -601,6 +603,7 @@ function progress(selectedId) {
     <div id="charts"></div>
     <div id="table"></div>
     <div class="row" style="margin-top:20px">
+      <button class="small primary" id="report">Therapist report</button>
       <button class="small outline" id="export">Export CSV</button>
       <button class="small ghost danger" id="clear">Clear all data</button>
     </div>
@@ -667,6 +670,7 @@ function progress(selectedId) {
       ${mine.slice().reverse().map((s) => `<tr><td>${new Date(s.ts).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${s.reps.length}</td><td>${s.maxPos}°</td>${ex.neg ? `<td>${s.maxNeg}°</td>` : ''}<td>${s.avgHold != null ? s.avgHold.toFixed(1) + 's' : '–'}</td><td>${s.pain ?? '–'}</td></tr>`).join('')}
     </tbody></table></div>`;
   }
+  app.querySelector('#report').onclick = () => go('report');
   app.querySelector('#export').onclick = async () => {
     const csv = exportCsv();
     try { await navigator.clipboard.writeText(csv); app.querySelector('#export').textContent = 'Copied to clipboard'; } catch {}

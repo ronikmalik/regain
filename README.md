@@ -47,7 +47,7 @@ pronation/supination, elbow flexion, shoulder forward raise. Adding one is a 6-l
 
 ## Progress roadmap
 
-See [docs/PROGRESS_PLAN.md](docs/PROGRESS_PLAN.md) for how the per-set traces become smoothness, symmetry, hold and timeline views.
+Progress shows a weekly summary with guidance, a consistency calendar, recovery timelines with milestones and a projected date to target, hold and smoothness trends, pain vs range, two-set overlay and per-set replay. A printable therapist report (Progress > Therapist report) summarises everything with share and JSON export. See [docs/PROGRESS_PLAN.md](docs/PROGRESS_PLAN.md) for the metric definitions and what is next.
 
 ## Apple Watch (phase 2, scaffolded)
 
