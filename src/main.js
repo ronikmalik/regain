@@ -165,7 +165,7 @@ function setup(ex) {
     </div>
     <div class="card"><span class="eyebrow">Before you start</span>${lines([
       'Tap Start with your other hand.',
-      MOUNT().pad ? 'Lay your thumb flat over the corner pad to begin the countdown.' : 'Get into the start position during the ' + MOUNT().countdown + ' second countdown.',
+      MOUNT().pad ? 'Lay your thumb flat over the pad to begin the countdown.' : 'Get into the start position during the ' + MOUNT().countdown + ' second countdown.',
       'Hold still until you hear "Go".',
       MOUNT().pad ? 'Reps only count while your thumb is on the pad.' : 'Nothing touches the screen during the set.',
       'Move slowly. Stop on sharp pain.',
@@ -326,7 +326,7 @@ function live() {
   app.innerHTML = `
     ${header({ title: ex.name, right: `<span class="chip warn" id="state"><span class="dot"></span>Waiting</span>` })}
     <div class="overlay" id="overlay" hidden><div class="eyebrow" id="ov-title">Hold the starting position</div><div class="count" id="count">3</div><p class="muted">${ex.arm}</p></div>
-    ${MOUNT().pad ? `<button class="thumbpad corner" id="pad" data-side="${settings.hand}" aria-label="Thumb pad: keep your thumb here during the set">${THUMB}<span>Thumb here</span></button>` : ''}
+    ${MOUNT().pad ? `<button class="thumbpad" id="pad" aria-label="Thumb pad: keep your thumb here during the set">${THUMB}<span>Thumb here</span></button>` : ''}
     <div class="card monitor">
       <div class="mhead"><span class="eyebrow">${ex.joint} · ${settings.hand} · ${SOURCE_LABEL[settings.source]}</span><span class="timer" id="timer">00:00</span></div>
       <svg class="gauge" viewBox="0 0 300 170" id="gauge"></svg>

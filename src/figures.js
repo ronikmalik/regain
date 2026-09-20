@@ -181,7 +181,7 @@ const MOUNT_FIGS = {
     return g;
   },
   // Tray grip. Main view: screen toward us, the four straight fingers drawn x-ray style behind the
-  // phone pointing up from the bottom, thumb tip pinning the lower corner. Inset: edge view of the
+  // phone pointing up from the bottom, thumb lying flat across the lower middle of the screen. Inset: edge view of the
   // phone lying flat on the fingers.
   held: (h) => {
     let g = '';
@@ -194,12 +194,12 @@ const MOUNT_FIGS = {
     for (const [x, top] of [[px + 8, 66], [px + 27, 52], [px + 46, 58], [px + 65, 80]]) {
       g += `<rect x="${Math.min(h.X(x), h.X(x + 15))}" y="${top}" width="15" height="${py + ph - 6 - top}" rx="7.5" fill="${skin}" opacity="0.4" stroke="${skin}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
     }
-    // corner pad zone + thumb pinning it
-    const cx = px + pw - 6, cy = py + ph - 8;
-    g += `<path d="M${h.X(cx)},${cy} L${h.X(cx)},${cy - 60} A60,60 0 0 ${h.X(1) > h.X(0) ? 0 : 1} ${h.X(cx - 60)},${cy} Z" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
-    g += h.line(px + pw + 30, py + ph + 4, px + pw - 14, py + ph - 22, 19, skin) + h.line(px + pw - 14, py + ph - 22, px + pw - 40, py + ph - 44, 16, skin);
+    // pad zone in the lower middle of the screen + thumb lying flat across it
+    const cx = px + pw / 2, cy = py + ph - 40;
+    g += `<circle cx="${h.X(cx)}" cy="${cy}" r="30" fill="var(--accent)" opacity="0.35" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 3"/>`;
+    g += h.line(px + pw + 30, py + ph - 2, px + pw - 10, py + ph - 26, 19, skin) + h.line(px + pw - 10, py + ph - 26, px + pw / 2 - 6, py + ph - 42, 16, skin);
     g += h.text(px + pw / 2, 214, 'fingers straight behind the phone', 'middle', 'var(--text-2)', 10);
-    // inset: edge view, fingers horizontal, phone lying on them, thumb pressing the far corner from above
+    // inset: edge view, fingers horizontal, phone lying on them, thumb wrapped round the bottom edge, lying flat on the screen
     const ix = 196, iy = 120;
     g += h.text(ix + 42, 70, 'Side view', 'middle', 'var(--text-3)', 10);
     g += h.line(ix - 4, iy + 12, ix + 88, iy + 12, 16, skin);                                          // fingers, pointing to the top of the phone
@@ -208,7 +208,7 @@ const MOUNT_FIGS = {
     g += h.line(ix - 16, iy + 10, ix - 4, iy - 8, 12, skin) + h.line(ix - 4, iy - 8, ix + 34, iy - 8, 12, skin); // thumb wraps round the bottom edge and lies flat along the screen
     g += h.text(ix + 42, iy + 40, 'flat on the fingers', 'middle', 'var(--text-2)', 10);
     g += h.text(ix + 42, iy + 54, 'thumb flat on the screen', 'middle', 'var(--text-2)', 10);
-    g += h.text(150, 228, 'Straight fingers · thumb flat across the corner pad', 'middle', 'var(--text-3)', 11);
+    g += h.text(150, 228, 'Straight fingers · thumb flat across the pad', 'middle', 'var(--text-3)', 11);
     return g;
   },
 };

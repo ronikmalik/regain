@@ -28,11 +28,11 @@ export const MOUNTS = {
     name: 'Hand-held',
     tag: 'No equipment',
     short: 'Hand-held',
-    summary: 'Phone lies flat on four straight fingers. The thumb rests flat across the lower corner of the screen.',
+    summary: 'Phone lies flat on four straight fingers. The thumb rests flat across the lower middle of the screen.',
     how: [
       'Hold four fingers straight and together, palm up.',
       'Lay the phone face-up along the fingers, top toward the fingertips.',
-      'Rest your thumb flat across the lower corner of the screen, over the pad.',
+      'Rest your thumb flat across the lower middle of the screen, over the pad.',
       'Keep fingers and thumb still. Do not squeeze or press.',
     ],
     countdown: 3,
